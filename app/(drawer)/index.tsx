@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, View, ScrollView, Animated, Pressable, TouchableOpacity, Easing, KeyboardAvoidingView, Platform, Image, RefreshControl } from "react-native";
+import { View, ScrollView, Animated, Pressable, TouchableOpacity, Easing, KeyboardAvoidingView, Platform, Image, RefreshControl } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -25,7 +25,6 @@ import {
 } from '../../utils/limits';
 import { AppTheme } from '../../utils/theme/theme';
 import { useThemePreference } from '../../utils/theme/themePreference';
-import { VoiceIntentModal } from '../../components/voice/VoiceIntentModal';
 import { AppProgressDialog } from '../../components/AppProgressDialog';
 import {
   loadSyncDisabledHouseIds,
@@ -35,7 +34,6 @@ import {
 } from '../../utils/sync/settingsMetadata';
 import { computeBootstrapSyncState } from '../../utils/sync/bootstrapState';
 import { useAuth } from '../../utils/auth/AuthContext';
-import { useSignInSheet } from '../../utils/auth/SignInSheetContext';
 import { usePowerSyncReadModeEnabled } from '@/utils/powersync/readMode';
 import { syncPowerSyncConnectionForSession } from '@/utils/powersync/connectionLifecycle';
 import { dismissInboxBanner, useInboxPending } from '@/src/inbox';
@@ -126,7 +124,6 @@ export default function Index() {
   const [fabOpen, setFabOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isVoiceModalVisible, setIsVoiceModalVisible] = useState(false);
   const globalRefreshKey = useGlobalRefresh();
   const searchbarRef = useRef<any>(null);
   const { q } = useLocalSearchParams<{ q?: string }>();
@@ -146,7 +143,6 @@ export default function Index() {
   const { activeHouse, activeHouseId, setActiveHouseById } = useActiveHouse();
   const { resolvedTheme } = useThemePreference();
   const { user } = useAuth();
-  const { openSignIn } = useSignInSheet();
   const powerSyncReadModeEnabled = usePowerSyncReadModeEnabled();
   const { pendingCount, newestPendingCreatedAt, lastDismissedAt, setLastDismissedAt } = useInboxPending();
   const statusBarStyle = resolvedTheme === 'dark' ? 'light' : 'dark';
@@ -432,21 +428,6 @@ export default function Index() {
   const handleExitSearch = () => {
     setIsSearching(false);
     setSearchQuery('');
-  };
-
-  const handleVoicePress = () => {
-    if (!user) {
-      Alert.alert(
-        'Sign in required',
-        'Sign in to use voice actions.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign in', onPress: () => openSignIn() },
-        ]
-      );
-      return;
-    }
-    setIsVoiceModalVisible(true);
   };
 
   const handleMenuPress = () => {
@@ -883,15 +864,6 @@ export default function Index() {
         testID="home-search-button"
         color={`${colors.primary}${opacity.alpha80}`}
       />
-      {editionCapabilities.voice ? (
-        <Appbar.Action
-          icon="assistant"
-          onPress={handleVoicePress}
-          accessibilityLabel="Voice action"
-          testID="home-voice-action-button"
-          color={`${colors.primary}${opacity.alpha80}`}
-        />
-      ) : null}
     </>
   )}
 </Appbar.Header>
@@ -1333,13 +1305,6 @@ export default function Index() {
         )}
 
       </SafeAreaView>
-
-      {editionCapabilities.voice ? (
-        <VoiceIntentModal
-          visible={isVoiceModalVisible}
-          onDismiss={() => setIsVoiceModalVisible(false)}
-        />
-      ) : null}
 
       {/* Custom FAB Menu positioned outside SafeAreaView */}
       {shouldRenderFabOverlay ? renderFabOverlay(mode === 'full' ? (

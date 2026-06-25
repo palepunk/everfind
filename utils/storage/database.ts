@@ -109,9 +109,8 @@ const upsertRecord = async (table: TableName, record: Record<string, any>) => {
   if (!row.id) row.id = createId();
   const columns = TABLE_COLUMNS[table];
   const placeholders = columns.map(() => '?').join(', ');
-  const updates = columns.filter((column) => column !== 'id').map((column) => `${column} = excluded.${column}`).join(', ');
   await db.execute(
-    `INSERT INTO ${tableName(table)} (${columns.join(', ')}) VALUES (${placeholders}) ON CONFLICT(id) DO UPDATE SET ${updates}`,
+    `INSERT OR REPLACE INTO ${tableName(table)} (${columns.join(', ')}) VALUES (${placeholders})`,
     columns.map((column) => row[column])
   );
   record.id = row.id;
