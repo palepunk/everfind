@@ -1,4 +1,4 @@
-# everfind FOSS
+# everfind - FOSS edition
 
 everfind is a home inventory app for keeping track of what you own and where it is stored.
 It helps you organize houses, rooms, containers, boxes, and items, then search your inventory
@@ -31,6 +31,15 @@ public FOSS repository.
 - Export inventory views to PDF.
 - Use bulk voice add for faster item entry when speech recognition is available on the device.
 - Use the app offline without signing in.
+
+## Installation ot the FOSS edition
+
+Download the latest APK from the [Releases](https://github.com/palepunk/everfind/releases) page and install it directly on your Android device.
+
+## License
+
+The application code is licensed under the MIT License. Bundled app artwork, icons, and
+screenshots are covered in [ASSET_LICENSES.md](ASSET_LICENSES.md).
 
 ## Requirements
 
