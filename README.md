@@ -4,6 +4,13 @@ everfind is a home inventory app for keeping track of what you own and where it 
 It helps you organize houses, rooms, containers, boxes, and items, then search your inventory
 when you need to find something.
 
+<p align="center">
+<img src="icon-192.png" alt="everfind icon" height="80">
+</p>
+<p align="center">
+<img src="app screenshots.png" alt="App screenshots" height="310">
+</p>
+
 This repository contains the open-source FOSS edition of everfind. It is the local-first
 edition: no account is required, data is stored on your device, and the app can be used
 offline. The commercial everfind app is also available on:
