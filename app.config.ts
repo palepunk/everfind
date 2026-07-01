@@ -1,21 +1,22 @@
 // app.config.ts
 import 'dotenv/config';
 
+const appVersion = require('./app.version');
 const variant = process.env.APP_VARIANT ?? 'development';
 const isDev = variant === 'development';
 const isTest = variant === 'test';
 const isProd = variant === 'production';
 
 const androidVersionCode = (() => {
-  if (isProd) return Number(process.env.ANDROID_VERSION_CODE ?? 50);
-  if (isTest) return Number(process.env.ANDROID_VERSION_CODE_TEST ?? 1001);
-  return Number(process.env.ANDROID_VERSION_CODE_DEV ?? 2001);
+  if (isProd) return Number(process.env.ANDROID_VERSION_CODE ?? appVersion.androidVersionCode.production);
+  if (isTest) return Number(process.env.ANDROID_VERSION_CODE_TEST ?? appVersion.androidVersionCode.test);
+  return Number(process.env.ANDROID_VERSION_CODE_DEV ?? appVersion.androidVersionCode.development);
 })();
 
 const config = {
   name: 'everfind',
   slug: 'everfind',
-  version: '1.5.0',
+  version: appVersion.version,
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   scheme: 'everfind-foss',

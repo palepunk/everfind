@@ -1,0 +1,11 @@
+everfind is a home inventory app for keeping track of what you own and where it is stored.
+It helps you organize houses, rooms, containers, boxes, and items, then search your inventory when you need to find something.
+
+Features
+- Create a searchable home inventory.
+- Organize items by rooms, containers, boxes, and storage locations.
+- Add names, descriptions, notes, prices, tags, and photos.
+- Import and export inventory data with CSV.
+- Export inventory views to PDF.
+- Use bulk voice add for faster item entry when speech recognition is available on the device.
+- Use the app offline without signing in.

@@ -25,6 +25,7 @@ const loadLimitsWithLocalData = (initialData) =>
       getPowerSyncRepositoryRooms: async () => [],
     },
     './edition/planLimits': {
+      getFallbackPlanLimitInfo: (limits) => ({ planId: 'foss', limits }),
       loadRemotePlanLimitData: async () => null,
     },
   });
@@ -80,6 +81,7 @@ test('finite remote plan limits still block cloud-only caps', async () => {
       getPowerSyncRepositoryRooms: async () => [],
     },
     './edition/planLimits': {
+      getFallbackPlanLimitInfo: (limits) => ({ planId: 'foss', limits }),
       loadRemotePlanLimitData: async () => ({
         plan_id: 'free',
         limits: {
@@ -103,6 +105,60 @@ test('finite remote plan limits still block cloud-only caps', async () => {
   assert.equal(limits.isAtAnyLimit(snapshot.usage, snapshot.limits), true);
   await assert.rejects(() => limits.assertCanAddHouse(), /HOUSE_LIMIT_REACHED/);
   await assert.rejects(() => limits.assertCanAddStorageUnit(), /STORAGE_UNIT_LIMIT_REACHED/);
+  await assert.rejects(() => limits.assertCanAddItem(), /ITEM_LIMIT_REACHED/);
+  await assert.rejects(() => limits.assertCanAddItemPicture('item-1'), /ITEM_PICTURE_LIMIT_REACHED/);
+});
+
+test('edition fallback can provide finite plan limits when remote plan data is unavailable', async () => {
+  const limits = loadWithMocks(limitsPath, {
+    './storage/database': {
+      database: createDatabaseMock({
+        houses: [{ id: 'house-1' }, { id: 'house-2' }],
+        rooms: [{ id: 'room-1' }],
+        containers: [{ id: 'container-1' }],
+        boxes: [],
+        items: Array.from({ length: 400 }, (_, index) => ({ id: `item-${index}` })),
+      }),
+    },
+    './storage/models': {},
+    './itemImages': {
+      getItemImageCount: async () => 1,
+    },
+    './powersync/readMode': {
+      loadPowerSyncReadModeEnabled: async () => false,
+    },
+    './powersync/repository': {
+      getPowerSyncRepositoryBoxes: async () => [],
+      getPowerSyncRepositoryContainers: async () => [],
+      getPowerSyncRepositoryHouses: async () => [],
+      getPowerSyncRepositoryItems: async () => [],
+      getPowerSyncRepositoryRooms: async () => [],
+    },
+    './edition/planLimits': {
+      getFallbackPlanLimitInfo: () => ({
+        planId: 'free',
+        limits: {
+          houses: 2,
+          storageUnits: 100,
+          items: 400,
+          itemPicturesPerItem: 1,
+        },
+      }),
+      loadRemotePlanLimitData: async () => null,
+    },
+  });
+
+  const snapshot = await limits.getPlanLimitSnapshot();
+
+  assert.equal(snapshot.planId, 'free');
+  assert.deepEqual(snapshot.limits, {
+    houses: 2,
+    storageUnits: 100,
+    items: 400,
+    itemPicturesPerItem: 1,
+  });
+  assert.equal(limits.isAtAnyLimit(snapshot.usage, snapshot.limits), true);
+  await assert.rejects(() => limits.assertCanAddHouse(), /HOUSE_LIMIT_REACHED/);
   await assert.rejects(() => limits.assertCanAddItem(), /ITEM_LIMIT_REACHED/);
   await assert.rejects(() => limits.assertCanAddItemPicture('item-1'), /ITEM_PICTURE_LIMIT_REACHED/);
 });

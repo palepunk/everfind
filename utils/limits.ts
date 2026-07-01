@@ -9,7 +9,7 @@ import {
   getPowerSyncRepositoryItems,
   getPowerSyncRepositoryRooms,
 } from './powersync/repository';
-import { loadRemotePlanLimitData } from './edition/planLimits';
+import { getFallbackPlanLimitInfo, loadRemotePlanLimitData } from './edition/planLimits';
 
 export const UNLIMITED_LIMIT = Number.POSITIVE_INFINITY;
 export const HOUSE_LIMIT = UNLIMITED_LIMIT;
@@ -106,9 +106,10 @@ export async function getPlanLimitSnapshot(): Promise<PlanLimitSnapshot> {
   const data = (await loadRemotePlanLimitData()) as any;
 
   if (!data) {
+    const fallback = getFallbackPlanLimitInfo(DEFAULT_LIMITS);
     return {
-      planId: 'foss',
-      limits: DEFAULT_LIMITS,
+      planId: fallback.planId,
+      limits: fallback.limits,
       usage: await getLocalLimitCounts(),
     };
   }
