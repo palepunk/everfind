@@ -9,6 +9,21 @@ const { createAsyncStorageMock } = require('./helpers/createAsyncStorageMock');
 const { createDatabaseMock } = require('./helpers/createDatabaseMock');
 const settingsMetadataPath = path.resolve(__dirname, '../utils/sync/settingsMetadata.ts');
 
+const createPowerSyncMocks = (houseIds = []) => ({
+  '@/utils/powersync/readMode': {
+    loadPowerSyncReadModeEnabled: async () => houseIds.length > 0,
+  },
+  '@/utils/powersync/system': {
+    getPowerSyncDatabase: () => ({
+      waitForReady: async () => {},
+      getAll: async () => houseIds.map((id) => ({ id })),
+    }),
+  },
+  '@/utils/powersync/metadata': {
+    markPowerSyncHousesSynced: async () => {},
+  },
+});
+
 test('settings metadata keeps local houses unsynced until explicitly enabled', async () => {
   const AsyncStorage = createAsyncStorageMock();
   const database = createDatabaseMock({
@@ -21,6 +36,7 @@ test('settings metadata keeps local houses unsynced until explicitly enabled', a
     '@/utils/auth/session': {
       safeGetSession: async () => ({ access_token: 'token' }),
     },
+    ...createPowerSyncMocks(),
   });
 
   const syncedHouseIds = await settingsMetadata.loadSyncedHouseIds();
@@ -45,6 +61,7 @@ test('settings metadata only enables the install default house explicitly', asyn
     '@/utils/auth/session': {
       safeGetSession: async () => ({ access_token: 'token' }),
     },
+    ...createPowerSyncMocks(),
   });
 
   const autoSyncedHouseIds = await settingsMetadata.loadSyncedHouseIds();
@@ -68,6 +85,7 @@ test('settings metadata refuses to enable sync while signed out', async () => {
     '@/utils/auth/session': {
       safeGetSession: async () => null,
     },
+    ...createPowerSyncMocks(),
   });
 
   await assert.rejects(
@@ -89,6 +107,7 @@ test('settings metadata refuses global sync enable while signed out', async () =
     '@/utils/auth/session': {
       safeGetSession: async () => null,
     },
+    ...createPowerSyncMocks(),
   });
 
   await assert.rejects(
@@ -113,6 +132,7 @@ test('settings metadata persists manual sync toggles across reloads', async () =
     '@/utils/auth/session': {
       safeGetSession: async () => ({ access_token: 'token' }),
     },
+    ...createPowerSyncMocks(),
   });
 
   await settingsMetadata.setHouseSyncEnabled('house-a', true);
@@ -124,6 +144,7 @@ test('settings metadata persists manual sync toggles across reloads', async () =
     '@/utils/auth/session': {
       safeGetSession: async () => ({ access_token: 'token' }),
     },
+    ...createPowerSyncMocks(),
   });
 
   const syncedHouseIds = await settingsMetadata.loadSyncedHouseIds();
@@ -131,4 +152,56 @@ test('settings metadata persists manual sync toggles across reloads', async () =
 
   assert.deepEqual(syncedHouseIds, ['house-a']);
   assert.deepEqual(disabledHouseIds, ['house-b']);
+});
+
+test('settings metadata auto-enables visible PowerSync remote houses', async () => {
+  const markedSynced = [];
+  const AsyncStorage = createAsyncStorageMock();
+  const database = createDatabaseMock({
+    houses: [],
+  });
+
+  const settingsMetadata = loadWithMocks(settingsMetadataPath, {
+    '@react-native-async-storage/async-storage': AsyncStorage,
+    '@/utils/storage/database': { database },
+    '@/utils/auth/session': {
+      safeGetSession: async () => ({ access_token: 'token' }),
+    },
+    ...createPowerSyncMocks(['remote-a', 'remote-b']),
+    '@/utils/powersync/metadata': {
+      markPowerSyncHousesSynced: async (ids) => {
+        markedSynced.push(ids);
+      },
+    },
+  });
+
+  const syncedHouseIds = await settingsMetadata.loadSyncedHouseIds();
+
+  assert.deepEqual(syncedHouseIds, ['remote-a', 'remote-b']);
+  assert.deepEqual(markedSynced, [['remote-a', 'remote-b']]);
+  assert.equal(await settingsMetadata.isHouseSyncEnabled('remote-a'), true);
+});
+
+test('settings metadata preserves manual off for visible PowerSync remote houses', async () => {
+  const AsyncStorage = createAsyncStorageMock({
+    houseSyncModesByHouseId: JSON.stringify({ 'remote-a': 'manual_off' }),
+  });
+  const database = createDatabaseMock({
+    houses: [],
+  });
+
+  const settingsMetadata = loadWithMocks(settingsMetadataPath, {
+    '@react-native-async-storage/async-storage': AsyncStorage,
+    '@/utils/storage/database': { database },
+    '@/utils/auth/session': {
+      safeGetSession: async () => ({ access_token: 'token' }),
+    },
+    ...createPowerSyncMocks(['remote-a', 'remote-b']),
+  });
+
+  const syncedHouseIds = await settingsMetadata.loadSyncedHouseIds();
+  const disabledHouseIds = await settingsMetadata.loadSyncDisabledHouseIds();
+
+  assert.deepEqual(syncedHouseIds, ['remote-b']);
+  assert.deepEqual(disabledHouseIds, ['remote-a']);
 });

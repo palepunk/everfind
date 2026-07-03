@@ -1,0 +1,2 @@
+Updated the FOSS edition app icon and splash screen.
+Improved edition-specific behavior for the open source build.

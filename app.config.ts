@@ -18,13 +18,13 @@ const config = {
   slug: 'everfind',
   version: appVersion.version,
   orientation: 'portrait',
-  icon: './assets/images/icon.png',
+  icon: './assets/images/icon-foss.png',
   scheme: 'everfind-foss',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
 
   ios: {
-    icon: './assets/images/ios-icon.png',
+    icon: './assets/images/ios-icon-foss.png',
     supportsTablet: false,
     bundleIdentifier: 'online.everfind.app.foss',
     infoPlist: {
@@ -46,7 +46,7 @@ const config = {
     versionCode: androidVersionCode,
     adaptiveIcon: {
       backgroundColor: '#ffffff',
-      foregroundImage: './assets/images/android-icon-foreground.png',
+      foregroundImage: './assets/images/android-icon-foreground-foss.png',
     },
     permissions: ['RECORD_AUDIO'],
     intentFilters: [],
@@ -65,7 +65,7 @@ const config = {
     [
       'expo-splash-screen',
       {
-        image: './assets/images/splash-icon.png',
+        image: './assets/images/splash-icon-foss.png',
         imageWidth: 200,
         resizeMode: 'contain',
         backgroundColor: '#ffffff',

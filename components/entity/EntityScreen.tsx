@@ -84,6 +84,7 @@ import {
 } from '@/utils/collaboration/houseSharing';
 import { getHouseSyncState } from '@/utils/sync/houseSyncState';
 import { usePowerSyncReadModeEnabled } from '@/utils/powersync/readMode';
+import { editionCapabilities } from '@/utils/edition/config';
 import {
   createPowerSyncLocalHouse,
   createPowerSyncLocalRoom,
@@ -3516,153 +3517,157 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
           extraSection={
             config.type === 'house' && entityId ? (
               <View style={{ gap: spacing.lg }}>
-                <Surface
-                  style={{
-                    backgroundColor: surfaces.card,
-                    borderRadius: shapes.cornerLarge,
-                    padding: spacing.xxl,
-                    gap: spacing.md,
-                  }}
-                  elevation={elevation.level1}
-                >
-                  <Text variant="titleMedium" style={{ color: colors.onSurface }}>
-                    Cloud sync
-                  </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <View style={{ flex: 1, paddingRight: spacing.md }}>
-                      <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-                        {collaboration?.sync_required
-                          ? 'Cloud sync is required while this house has members or active invites'
-                          : houseSyncEnabled
-                          ? 'Cloud sync is enabled for this house'
-                          : 'Cloud sync is off for this house'}
-                      </Text>
-                    </View>
-                    <Switch
-                      value={houseSyncEnabled}
-                      disabled={houseSyncLoading || Boolean(collaboration?.sync_required)}
-                      onValueChange={(nextValue) => {
-                        void handleToggleHouseSync(nextValue);
-                      }}
-                    />
-                  </View>
-                </Surface>
-
-                <Surface
-                  style={{
-                    backgroundColor: surfaces.card,
-                    borderRadius: shapes.cornerLarge,
-                    padding: spacing.xxl,
-                    gap: spacing.md,
-                  }}
-                  elevation={elevation.level1}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                {editionCapabilities.cloudSync ? (
+                  <Surface
+                    style={{
+                      backgroundColor: surfaces.card,
+                      borderRadius: shapes.cornerLarge,
+                      padding: spacing.xxl,
+                      gap: spacing.md,
+                    }}
+                    elevation={elevation.level1}
+                  >
                     <Text variant="titleMedium" style={{ color: colors.onSurface }}>
-                      Members
+                      Cloud sync
                     </Text>
-                    {canAdminHouse ? (
-                      <Button compact mode="text" onPress={openInviteSheet}>
-                        Invite member
-                      </Button>
-                    ) : null}
-                  </View>
-                  {collaborationLoading ? (
-                    <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-                      Loading members...
-                    </Text>
-                  ) : collaboration ? (
-                    <>
-                      {canAdminHouse ? (
-                        <Text variant="bodySmall" style={{ color: colors.onSurfaceVariant }}>
-                          {collaborationLimits.member_count + collaborationLimits.active_invite_count} / {collaborationLimits.member_limit} members
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flex: 1, paddingRight: spacing.md }}>
+                        <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
+                          {collaboration?.sync_required
+                            ? 'Cloud sync is required while this house has members or active invites'
+                            : houseSyncEnabled
+                            ? 'Cloud sync is enabled for this house'
+                            : 'Cloud sync is off for this house'}
                         </Text>
-                      ) : null}
-
-                      <View style={{ gap: spacing.sm }}>
-                        {memberRows.length ? (
-                          memberRows.map((row) => (
-                            <Surface
-                              key={row.key}
-                              elevation={elevation.level0}
-                              style={{
-                                backgroundColor: surfaces.cardLow,
-                                borderRadius: shapes.cornerMedium,
-                                paddingHorizontal: spacing.sm,
-                                paddingVertical: spacing.sm,
-                                gap: spacing.sm,
-                              }}
-                            >
-                              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                                <View style={{ flex: 1, paddingRight: spacing.sm, gap: spacing.xs }}>
-                                  <Text variant="titleSmall" style={{ color: colors.onSurface }}>
-                                    {row.name}
-                                  </Text>
-                                  <View style={{ flexDirection: 'row', gap: spacing.xs }}>
-                                    <Surface
-                                      elevation={0}
-                                      style={{
-                                        backgroundColor: colors.surfaceVariant,
-                                        borderRadius: shapes.cornerSmall,
-                                        paddingHorizontal: spacing.sm,
-                                        paddingVertical: spacing.xs,
-                                      }}
-                                    >
-                                      <Text variant="labelSmall" style={{ color: colors.onSurfaceVariant }}>
-                                        {row.role}
-                                      </Text>
-                                    </Surface>
-                                    <Surface
-                                      elevation={0}
-                                      style={{
-                                        backgroundColor:
-                                          row.status === 'invited' ? colors.tertiaryContainer : colors.primaryContainer,
-                                        borderRadius: shapes.cornerSmall,
-                                        paddingHorizontal: spacing.sm,
-                                        paddingVertical: spacing.xs,
-                                      }}
-                                    >
-                                      <Text
-                                        variant="labelSmall"
-                                        style={{
-                                          color:
-                                            row.status === 'invited'
-                                              ? colors.onTertiaryContainer
-                                              : colors.onPrimaryContainer,
-                                        }}
-                                      >
-                                        {row.status}
-                                      </Text>
-                                    </Surface>
-                                  </View>
-                                </View>
-                                {row.canManage ? (
-                                  <Button compact mode="text" onPress={row.onManage}>
-                                    {row.status === 'invited' ? 'Revoke' : 'Manage'}
-                                  </Button>
-                                ) : null}
-                              </View>
-                            </Surface>
-                          ))
-                        ) : (
-                          <Text variant="bodySmall" style={{ color: colors.onSurfaceVariant }}>
-                            No members yet.
-                          </Text>
-                        )}
                       </View>
+                      <Switch
+                        value={houseSyncEnabled}
+                        disabled={houseSyncLoading || Boolean(collaboration?.sync_required)}
+                        onValueChange={(nextValue) => {
+                          void handleToggleHouseSync(nextValue);
+                        }}
+                      />
+                    </View>
+                  </Surface>
+                ) : null}
 
-                      {canLeaveHouse ? (
-                        <Button mode="outlined" textColor={colors.error} onPress={() => void handleLeaveHouse()}>
-                          Leave house
+                {editionCapabilities.collaboration ? (
+                  <Surface
+                    style={{
+                      backgroundColor: surfaces.card,
+                      borderRadius: shapes.cornerLarge,
+                      padding: spacing.xxl,
+                      gap: spacing.md,
+                    }}
+                    elevation={elevation.level1}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text variant="titleMedium" style={{ color: colors.onSurface }}>
+                        Members
+                      </Text>
+                      {canAdminHouse ? (
+                        <Button compact mode="text" onPress={openInviteSheet}>
+                          Invite member
                         </Button>
                       ) : null}
-                    </>
-                  ) : (
-                    <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-                      Members information is unavailable.
-                    </Text>
-                  )}
-                </Surface>
+                    </View>
+                    {collaborationLoading ? (
+                      <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
+                        Loading members...
+                      </Text>
+                    ) : collaboration ? (
+                      <>
+                        {canAdminHouse ? (
+                          <Text variant="bodySmall" style={{ color: colors.onSurfaceVariant }}>
+                            {collaborationLimits.member_count + collaborationLimits.active_invite_count} / {collaborationLimits.member_limit} members
+                          </Text>
+                        ) : null}
+
+                        <View style={{ gap: spacing.sm }}>
+                          {memberRows.length ? (
+                            memberRows.map((row) => (
+                              <Surface
+                                key={row.key}
+                                elevation={elevation.level0}
+                                style={{
+                                  backgroundColor: surfaces.cardLow,
+                                  borderRadius: shapes.cornerMedium,
+                                  paddingHorizontal: spacing.sm,
+                                  paddingVertical: spacing.sm,
+                                  gap: spacing.sm,
+                                }}
+                              >
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                                  <View style={{ flex: 1, paddingRight: spacing.sm, gap: spacing.xs }}>
+                                    <Text variant="titleSmall" style={{ color: colors.onSurface }}>
+                                      {row.name}
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+                                      <Surface
+                                        elevation={0}
+                                        style={{
+                                          backgroundColor: colors.surfaceVariant,
+                                          borderRadius: shapes.cornerSmall,
+                                          paddingHorizontal: spacing.sm,
+                                          paddingVertical: spacing.xs,
+                                        }}
+                                      >
+                                        <Text variant="labelSmall" style={{ color: colors.onSurfaceVariant }}>
+                                          {row.role}
+                                        </Text>
+                                      </Surface>
+                                      <Surface
+                                        elevation={0}
+                                        style={{
+                                          backgroundColor:
+                                            row.status === 'invited' ? colors.tertiaryContainer : colors.primaryContainer,
+                                          borderRadius: shapes.cornerSmall,
+                                          paddingHorizontal: spacing.sm,
+                                          paddingVertical: spacing.xs,
+                                        }}
+                                      >
+                                        <Text
+                                          variant="labelSmall"
+                                          style={{
+                                            color:
+                                              row.status === 'invited'
+                                                ? colors.onTertiaryContainer
+                                                : colors.onPrimaryContainer,
+                                          }}
+                                        >
+                                          {row.status}
+                                        </Text>
+                                      </Surface>
+                                    </View>
+                                  </View>
+                                  {row.canManage ? (
+                                    <Button compact mode="text" onPress={row.onManage}>
+                                      {row.status === 'invited' ? 'Revoke' : 'Manage'}
+                                    </Button>
+                                  ) : null}
+                                </View>
+                              </Surface>
+                            ))
+                          ) : (
+                            <Text variant="bodySmall" style={{ color: colors.onSurfaceVariant }}>
+                              No members yet.
+                            </Text>
+                          )}
+                        </View>
+
+                        {canLeaveHouse ? (
+                          <Button mode="outlined" textColor={colors.error} onPress={() => void handleLeaveHouse()}>
+                            Leave house
+                          </Button>
+                        ) : null}
+                      </>
+                    ) : (
+                      <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
+                        Members information is unavailable.
+                      </Text>
+                    )}
+                  </Surface>
+                ) : null}
               </View>
             ) : null
           }

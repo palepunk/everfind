@@ -1,6 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database } from '@/utils/storage/database';
 import { safeGetSession } from '@/utils/auth/session';
+import { loadPowerSyncReadModeEnabled } from '@/utils/powersync/readMode';
+import { getPowerSyncDatabase } from '@/utils/powersync/system';
+import { markPowerSyncHousesSynced } from '@/utils/powersync/metadata';
 
 // Shared sync preference metadata.
 //
@@ -169,21 +172,34 @@ const loadAllLocalHouseIds = async (): Promise<string[]> => {
   }
 };
 
+const loadVisiblePowerSyncHouseIds = async (): Promise<string[]> => {
+  try {
+    if (!(await loadPowerSyncReadModeEnabled())) return [];
+    const powerSyncDatabase = getPowerSyncDatabase();
+    await powerSyncDatabase.waitForReady();
+    const rows = await powerSyncDatabase.getAll<{ id: string }>('SELECT id FROM houses');
+    return dedupeHouseIds(rows.map((house) => String(house.id)));
+  } catch (error) {
+    console.warn('Failed to load PowerSync houses for sync metadata', error);
+    return [];
+  }
+};
+
 const emitSyncState = (houseIds: string[]) => {
   const next = dedupeHouseIds(houseIds);
   syncedHouseIdsListeners.forEach((listener) => listener(next));
   syncEnabledListeners.forEach((listener) => listener(next.length > 0));
 };
 
-const pruneHouseSyncModesToLocal = async (modes: HouseSyncModeMap) => {
+const pruneHouseSyncModesToVisible = async (modes: HouseSyncModeMap, extraVisibleHouseIds: string[] = []) => {
   const [localHouseIds, installDefaultHouseId] = await Promise.all([
     loadAllLocalHouseIds(),
     AsyncStorage.getItem(INSTALL_DEFAULT_HOUSE_ID_KEY),
   ]);
-  const localHouseIdSet = new Set(localHouseIds);
+  const visibleHouseIdSet = new Set([...localHouseIds, ...extraVisibleHouseIds]);
   return Object.fromEntries(
     Object.entries(modes).filter(([houseId, mode]) => {
-      if (!localHouseIdSet.has(houseId)) return false;
+      if (!visibleHouseIdSet.has(houseId)) return false;
       if (houseId === installDefaultHouseId && mode === 'auto_on') return false;
       return true;
     })
@@ -210,19 +226,37 @@ async function loadEffectiveHouseSyncState(): Promise<EffectiveHouseSyncState> {
 
   const initialized = await AsyncStorage.getItem(SYNC_ENABLED_HOUSE_IDS_INITIALIZED_KEY);
   const storedModes = await loadStoredHouseSyncModes();
-  const prunedModes = await pruneHouseSyncModesToLocal(storedModes);
-  const modesChanged =
-    JSON.stringify(Object.entries(prunedModes).sort()) !==
-    JSON.stringify(Object.entries(storedModes).sort());
+  const visiblePowerSyncHouseIds = await loadVisiblePowerSyncHouseIds();
+  const prunedModes = await pruneHouseSyncModesToVisible(storedModes, visiblePowerSyncHouseIds);
+  const nextModes = { ...prunedModes };
+  let remoteModesChanged = false;
 
-  if (modesChanged) {
-    await saveHouseSyncModes(prunedModes);
+  for (const houseId of visiblePowerSyncHouseIds) {
+    if (!nextModes[houseId]) {
+      nextModes[houseId] = 'auto_on';
+      remoteModesChanged = true;
+    }
   }
 
-  const enabledHouseIds = getEnabledHouseIdsFromModes(prunedModes);
-  const disabledHouseIds = getDisabledHouseIdsFromModes(prunedModes);
+  const modesChanged =
+    remoteModesChanged ||
+    JSON.stringify(Object.entries(nextModes).sort()) !==
+      JSON.stringify(Object.entries(storedModes).sort());
+
+  if (modesChanged) {
+    await saveHouseSyncModes(nextModes);
+    const autoEnabledPowerSyncHouseIds = visiblePowerSyncHouseIds.filter(
+      (houseId) => nextModes[houseId] === 'auto_on'
+    );
+    if (autoEnabledPowerSyncHouseIds.length > 0) {
+      await markPowerSyncHousesSynced(autoEnabledPowerSyncHouseIds);
+    }
+  }
+
+  const enabledHouseIds = getEnabledHouseIdsFromModes(nextModes);
+  const disabledHouseIds = getDisabledHouseIdsFromModes(nextModes);
   return {
-    modes: prunedModes,
+    modes: nextModes,
     enabledHouseIds,
     disabledHouseIds,
     initialized: initialized === 'true',
