@@ -32,7 +32,7 @@ public FOSS repository.
 - Use bulk voice add for faster item entry when speech recognition is available on the device.
 - Use the app offline without signing in.
 
-## Installation ot the FOSS edition
+## Installation of the FOSS edition
 
 Download the latest APK from the [Releases](https://github.com/palepunk/everfind/releases) page and install it directly on your Android device.
 
@@ -74,7 +74,10 @@ npm run lint
 
 ## Local Android Builds
 
-Generate the native Android project and build locally:
+The Android project is generated from the Expo config. Use production mode for release/F-Droid
+builds so the package name, version code, icon, and splash screen match the FOSS edition.
+
+On Windows Command Prompt:
 
 ```cmd
 set APP_VARIANT=production
@@ -83,11 +86,20 @@ cd android
 gradlew.bat :app:assembleRelease --no-daemon
 ```
 
-On PowerShell, use:
+On PowerShell:
 
 ```powershell
 $env:APP_VARIANT = "production"
 npx expo prebuild --platform android --clean
 Set-Location android
 .\gradlew :app:assembleRelease --no-daemon
+```
+
+On Linux or macOS:
+
+```bash
+export APP_VARIANT=production
+npx expo prebuild --platform android --clean
+cd android
+./gradlew :app:assembleRelease --no-daemon
 ```

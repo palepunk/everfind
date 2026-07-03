@@ -43,6 +43,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify production FOSS config
+        run: |
+          npx expo config --type public --json > expo-config.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync('expo-config.json', 'utf8'));
+          const appVersion = require('./app.version');
+          const expectedVersion = String(appVersion.version);
+          const expectedVersionCode = Number(appVersion.androidVersionCode.production);
+          const expectedTag = `v${expectedVersion}-foss`;
+          if (config.android?.package !== 'online.everfind.app.foss') {
+            throw new Error(`Unexpected Android package: ${config.android?.package}`);
+          }
+          if (config.version !== expectedVersion) {
+            throw new Error(`Unexpected version: ${config.version}`);
+          }
+          if (config.android?.versionCode !== expectedVersionCode) {
+            throw new Error(`Unexpected Android versionCode: ${config.android?.versionCode}`);
+          }
+          if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== expectedTag) {
+            throw new Error(`Tag ${process.env.GITHUB_REF_NAME} does not match expected ${expectedTag}`);
+          }
+          NODE
+
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean
 
