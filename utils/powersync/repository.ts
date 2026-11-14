@@ -132,6 +132,11 @@ type TombstoneTable = 'houses' | 'rooms' | 'containers' | 'boxes' | 'items' | 'i
 const notDeleted = (table: TombstoneTable, idColumn = 'id') =>
   `NOT EXISTS (SELECT 1 FROM local_metadata deleted WHERE deleted.id = 'deleted:${table}:' || ${idColumn})`;
 
+// Rows whose house is tombstoned (deleted locally, or hidden on sign-out) must
+// not surface through cross-house reads such as search, limits and export.
+const inVisibleHouse = (houseIdColumn = 'house_id') =>
+  `NOT EXISTS (SELECT 1 FROM local_metadata hidden_house WHERE hidden_house.id = 'deleted:houses:' || ${houseIdColumn})`;
+
 const loadSyncedPowerSyncHouseIds = async (database: PowerSyncReadDatabase) => {
   const [states, legacySyncedHouseIds] = await Promise.all([
     loadPowerSyncHouseSyncStates(),
@@ -468,6 +473,7 @@ export const getPowerSyncRepositoryRooms = async (
       FROM preferred_rows
       ${filter.clause}
       ${filter.clause ? 'AND' : 'WHERE'} ${notDeleted('rooms')}
+        AND ${inVisibleHouse()}
         AND ${noLocalFallbackForSyncedHouse()}
       ORDER BY lower(coalesce(name, '')), id
     `,
@@ -528,6 +534,7 @@ export const getPowerSyncRepositoryContainers = async (
       FROM preferred_rows
       ${filterClause}
       ${filterClause ? 'AND' : 'WHERE'} ${notDeleted('containers')}
+        AND ${inVisibleHouse('effective_house_id')}
         AND ${noLocalFallbackForSyncedHouse('effective_house_id')}
       ORDER BY lower(coalesce(name, '')), id
     `,
@@ -583,6 +590,7 @@ export const getPowerSyncRepositoryBoxes = async (
       FROM preferred_rows
       ${filter.clause}
       ${filter.clause ? 'AND' : 'WHERE'} ${notDeleted('boxes')}
+        AND ${inVisibleHouse()}
         AND ${noLocalFallbackForSyncedHouse()}
       ORDER BY lower(coalesce(name, '')), id
     `,
@@ -640,6 +648,7 @@ export const getPowerSyncRepositoryItems = async (
       FROM preferred_rows
       ${filter.clause}
       ${filter.clause ? 'AND' : 'WHERE'} ${notDeleted('items')}
+        AND ${inVisibleHouse()}
         AND ${noLocalFallbackForSyncedHouse()}
       ORDER BY lower(coalesce(name, '')), id
     `,
@@ -679,6 +688,7 @@ export const getPowerSyncRepositoryItemImages = async (
       LEFT JOIN item_images synced ON synced.id = image_ids.id
       LEFT JOIN local_item_images local ON local.id = image_ids.id
       WHERE ${notDeleted('item_images', 'image_ids.id')}
+        AND ${inVisibleHouse('coalesce(synced.house_id, local.house_id)')}
         AND NOT (
           coalesce(synced.house_id, local.house_id) IN (SELECT house_id FROM synced_house_ids)
           AND synced.id IS NULL
