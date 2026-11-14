@@ -524,8 +524,8 @@ export function VoiceBulkAddScreen() {
             <>
               <SheetButton
                 variant="secondary"
-                icon="reload"
-                label="Try again"
+                icon="microphone-plus"
+                label="Add more"
                 onPress={() => {
                   void startListening();
                 }}

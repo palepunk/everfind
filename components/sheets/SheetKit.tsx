@@ -241,7 +241,7 @@ export function SheetNotice({ tone = 'error', children, testID }: SheetNoticePro
 }
 
 type SheetButtonProps = {
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'danger';
   icon?: string;
   label: string;
   onPress: () => void;
@@ -265,8 +265,15 @@ export function SheetButton({
 }: SheetButtonProps) {
   const { colors, custom } = useTheme<AppTheme>();
   const { spacing, shapes, opacity } = custom;
-  const isPrimary = variant === 'primary';
-  const foreground = isPrimary ? colors.onPrimary : colors.onSurface;
+  const isOutlined = variant === 'secondary';
+  const background =
+    variant === 'primary' ? colors.primary : variant === 'danger' ? colors.errorContainer : 'transparent';
+  const foreground =
+    variant === 'primary'
+      ? colors.onPrimary
+      : variant === 'danger'
+        ? colors.onErrorContainer
+        : colors.onSurface;
 
   return (
     <Pressable
@@ -286,8 +293,8 @@ export function SheetButton({
           justifyContent: 'center',
           gap: spacing.sm,
           paddingHorizontal: spacing.xxl,
-          backgroundColor: isPrimary ? colors.primary : 'transparent',
-          borderWidth: isPrimary ? 0 : 1,
+          backgroundColor: background,
+          borderWidth: isOutlined ? 1 : 0,
           borderColor: `${colors.onSurface}${opacity.alpha24}`,
           opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
         },

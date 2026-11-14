@@ -17,6 +17,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import type { AppTheme } from '../../../utils/theme/theme';
+import { SheetButton, SheetHeader, SheetTheme, useSheetChrome } from '../../../components/sheets/SheetKit';
 import { useThemePreference } from '../../../utils/theme/themePreference';
 import { triggerGlobalRefresh, useActiveHouse } from '../../../utils/hooks/useDatabase';
 import {
@@ -56,7 +57,9 @@ import {
 type ExportFormat = 'csv' | 'pdf';
 
 export default function ImportExportScreen() {
-  const { colors, custom } = useTheme<AppTheme>();
+  const theme = useTheme<AppTheme>();
+  const { colors, custom } = theme;
+  const sheetChrome = useSheetChrome();
   const { spacing, shapes, elevation, surfaces, opacity } = custom;
   const insets = useSafeAreaInsets();
   const { resolvedTheme } = useThemePreference();
@@ -1024,115 +1027,101 @@ export default function ImportExportScreen() {
         enablePanDownToClose
         backdropComponent={renderExportSheetBackdrop}
         onDismiss={resetExportSheetState}
-        handleStyle={{ paddingTop: spacing.xs }}
-        handleIndicatorStyle={{
-          backgroundColor: `${colors.onSurface}${opacity.alpha30}`,
-          width: 36,
-          height: 5,
-        }}
-        backgroundStyle={{
-          backgroundColor: colors.surface,
-          borderTopLeftRadius: 22,
-          borderTopRightRadius: 22,
-        }}
+        {...sheetChrome.modalProps}
       >
-        <BottomSheetScrollView
-          contentContainerStyle={{
-            paddingHorizontal: spacing.xxl,
-            paddingTop: spacing.xxl,
-            paddingBottom: spacing.xxl + insets.bottom,
-            gap: spacing.md,
-          }}
-        >
-          <Text variant="titleMedium">
-            Select houses to export
-          </Text>
-          <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-            Only houses where you are owner or admin can be exported.
-          </Text>
-
-          <View style={{ gap: spacing.sm }}>
-            {exportHouseOptions.map((house) => {
-              const checked = selectedExportHouseIds.includes(house.id);
-              return (
-                <Pressable
-                  key={house.id}
-                  onPress={() => toggleHouseSelection(house.id)}
-                  style={({ pressed }) => ({
-                    backgroundColor: checked ? colors.primaryContainer : surfaces.cardLow,
-                    borderRadius: shapes.cornerMedium,
-                    borderWidth: 1,
-                    borderColor: checked
-                      ? `${colors.primary}${opacity.alpha20}`
-                      : `${colors.onSurface}${opacity.alpha12}`,
-                    paddingHorizontal: spacing.md,
-                    paddingVertical: spacing.md,
-                    opacity: pressed ? 0.9 : 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  })}
-                >
-                  <View style={{ flex: 1, paddingRight: spacing.md }}>
-                    <Text
-                      variant="bodyLarge"
-                      style={{ color: checked ? colors.onPrimaryContainer : colors.onSurface }}
-                    >
-                      {house.name}
-                    </Text>
-                    <Text
-                      variant="bodySmall"
-                      style={{
-                        color: checked ? colors.onPrimaryContainer : colors.onSurfaceVariant,
-                        marginTop: spacing.xs,
-                      }}
-                    >
-                      {houseAccessLabel(house)}
-                    </Text>
-                  </View>
-                  <Icon
-                    source={checked ? 'check-circle' : 'circle-outline'}
-                    size={22}
-                    color={checked ? colors.onPrimaryContainer : colors.onSurfaceVariant}
-                  />
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <Button
-              mode="contained-tonal"
-              onPress={() => setSelectedExportHouseIds(exportHouseOptions.map((house) => house.id))}
-              buttonColor={colors.primaryContainer}
-              textColor={colors.onPrimaryContainer}
-              style={{ flex: 1 }}
-            >
-              Select all
-            </Button>
-            <Button
-              mode="contained-tonal"
-              onPress={() => setSelectedExportHouseIds([])}
-              buttonColor={surfaces.cardLow}
-              textColor={colors.onSurface}
-              style={{ flex: 1 }}
-            >
-              Clear
-            </Button>
-          </View>
-
-          <Button
-            mode="contained-tonal"
-            onPress={() => void handleConfirmHouseSelection()}
-            disabled={!selectedExportHouseIds.length || Boolean(exportingKind)}
-            buttonColor={colors.primaryContainer}
-            textColor={colors.onPrimaryContainer}
-            contentStyle={{ paddingVertical: spacing.xs }}
-            style={{ borderRadius: shapes.cornerFull }}
+        <SheetTheme theme={theme}>
+          <BottomSheetScrollView
+            contentContainerStyle={{
+              paddingHorizontal: spacing.xxl,
+              paddingTop: spacing.xs,
+              paddingBottom: spacing.xxl + insets.bottom,
+              gap: spacing.xxl,
+            }}
           >
-            Export {pendingExportFormat === 'pdf' ? 'PDF' : 'CSV'}
-          </Button>
-        </BottomSheetScrollView>
+            <SheetHeader
+              title="Select houses to export"
+              subtitle="Only houses where you are owner or admin can be exported."
+              onClose={() => exportHouseSheetRef.current?.dismiss()}
+              closeLabel="Close export"
+            />
+
+            <View style={{ gap: spacing.sm }}>
+              {exportHouseOptions.map((house) => {
+                const checked = selectedExportHouseIds.includes(house.id);
+                return (
+                  <Pressable
+                    key={house.id}
+                    onPress={() => toggleHouseSelection(house.id)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked }}
+                    accessibilityLabel={house.name}
+                    style={({ pressed }) => ({
+                      backgroundColor: checked ? colors.primaryContainer : sheetChrome.cardBackground,
+                      borderRadius: shapes.cornerLarge,
+                      borderWidth: 1,
+                      borderColor: checked ? `${colors.primary}${opacity.alpha20}` : sheetChrome.hairline,
+                      paddingHorizontal: spacing.xxl,
+                      paddingVertical: spacing.lg,
+                      minHeight: 56,
+                      opacity: pressed ? 0.85 : 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing.lg,
+                    })}
+                  >
+                    <Icon
+                      source={checked ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
+                      size={24}
+                      color={checked ? colors.primary : colors.onSurfaceVariant}
+                    />
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text
+                        variant="bodyLarge"
+                        style={{
+                          color: checked ? colors.onPrimaryContainer : colors.onSurface,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {house.name}
+                      </Text>
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: checked ? colors.onPrimaryContainer : colors.onSurfaceVariant }}
+                      >
+                        {houseAccessLabel(house)}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={{ gap: spacing.lg }}>
+              <View style={{ flexDirection: 'row', gap: spacing.lg }}>
+                <SheetButton
+                  variant="secondary"
+                  label="Select all"
+                  onPress={() => setSelectedExportHouseIds(exportHouseOptions.map((house) => house.id))}
+                />
+                <SheetButton
+                  variant="secondary"
+                  label="Clear"
+                  disabled={!selectedExportHouseIds.length}
+                  onPress={() => setSelectedExportHouseIds([])}
+                />
+              </View>
+              <View style={{ flexDirection: 'row' }}>
+                <SheetButton
+                  icon="export-variant"
+                  label={`Export ${pendingExportFormat === 'pdf' ? 'PDF' : 'CSV'}`}
+                  loading={Boolean(exportingKind)}
+                  disabled={!selectedExportHouseIds.length || Boolean(exportingKind)}
+                  onPress={() => void handleConfirmHouseSelection()}
+                />
+              </View>
+            </View>
+          </BottomSheetScrollView>
+        </SheetTheme>
       </BottomSheetModal>
 
     </>

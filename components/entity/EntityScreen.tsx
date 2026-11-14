@@ -4,11 +4,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
-import { Appbar, Button, Icon, IconButton, Snackbar, Surface, Switch, Text, TextInput, useTheme } from 'react-native-paper';
+import { Appbar, Button, Icon, Snackbar, Surface, Switch, Text, TextInput, useTheme } from 'react-native-paper';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { FullWindowOverlay } from 'react-native-screens';
 import { Q } from '@/utils/storage/query';
+import {
+  SheetButton,
+  SheetCard,
+  SheetHeader,
+  SheetNotice,
+  SheetRow,
+  SheetTheme,
+  useSheetChrome,
+} from '@/components/sheets/SheetKit';
 
 import FullScreenImageViewer from '@/app/components/FullScreenImageViewer';
 import { deleteImage, isPlatformSupported, pickImage, takePhoto } from '@/utils/imageUtils';
@@ -156,6 +165,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
   const { colors, custom } = theme;
   const { spacing, typography, shapes, elevation, surfaces, opacity } = custom;
   const insets = useSafeAreaInsets();
+  const sheetChrome = useSheetChrome();
   const isIos = Platform.OS === 'ios';
   const isFocused = useIsFocused();
   const { user } = useAuth();
@@ -3388,57 +3398,43 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         enableDynamicSizing={false}
         enablePanDownToClose
         backdropComponent={renderInviteSheetBackdrop}
-        handleStyle={{ paddingTop: spacing.xs }}
-        handleIndicatorStyle={{
-          backgroundColor: `${colors.onSurface}${opacity.alpha20}`,
-          width: 36,
-          height: 5,
-        }}
-        backgroundStyle={{
-          backgroundColor: colors.surface,
-          borderTopLeftRadius: 22,
-          borderTopRightRadius: 22,
-        }}
+        {...sheetChrome.modalProps}
       >
-        <BottomSheetScrollView
-          contentContainerStyle={{
-            paddingHorizontal: spacing.xxl,
-            paddingTop: spacing.xxl,
-            paddingBottom: spacing.xxl + insets.bottom,
-            gap: spacing.md,
-          }}
-        >
-          <Text
-            variant="titleMedium"
-            style={{
-              color: colors.onSurface,
-              textAlign: 'center',
-              fontWeight: '600',
+        <SheetTheme theme={theme}>
+          <BottomSheetScrollView
+            contentContainerStyle={{
+              paddingHorizontal: spacing.xxl,
+              paddingTop: spacing.xs,
+              paddingBottom: spacing.xxl + insets.bottom,
+              gap: spacing.xxl,
             }}
           >
-            Record diagnostics
-          </Text>
-          <Surface
-            elevation={elevation.level1}
-            style={{
-              padding: spacing.lg,
-              borderRadius: shapes.cornerLarge,
-              backgroundColor: surfaces.card,
-              gap: spacing.md,
-            }}
-          >
-            <Button mode="outlined" onPress={() => void loadRecordDiagnostics()} loading={recordDiagnosticsLoading}>
-              Refresh diagnostics
-            </Button>
-            <Text
-              variant="bodySmall"
-              selectable
-              style={{ color: colors.onSurfaceVariant, fontFamily: typography.monospace?.fontFamily }}
-            >
-              {recordDiagnosticsLoading ? 'Loading...' : recordDiagnostics}
-            </Text>
-          </Surface>
-        </BottomSheetScrollView>
+            <SheetHeader
+              title="Record diagnostics"
+              onClose={() => diagnosticsSheetRef.current?.dismiss()}
+              closeLabel="Close diagnostics"
+            />
+            <View style={{ flexDirection: 'row' }}>
+              <SheetButton
+                variant="secondary"
+                icon="refresh"
+                label="Refresh diagnostics"
+                loading={recordDiagnosticsLoading}
+                disabled={recordDiagnosticsLoading}
+                onPress={() => void loadRecordDiagnostics()}
+              />
+            </View>
+            <SheetCard>
+              <Text
+                variant="bodySmall"
+                selectable
+                style={{ color: colors.onSurfaceVariant, fontFamily: typography.monospace?.fontFamily }}
+              >
+                {recordDiagnosticsLoading ? 'Loading...' : recordDiagnostics}
+              </Text>
+            </SheetCard>
+          </BottomSheetScrollView>
+        </SheetTheme>
       </BottomSheetModal>
 
       <BottomSheetModal
@@ -3451,149 +3447,129 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         keyboardBehavior="interactive"
         keyboardBlurBehavior="restore"
         android_keyboardInputMode="adjustResize"
-        handleStyle={{ paddingTop: spacing.xs }}
-        handleIndicatorStyle={{
-          backgroundColor: `${colors.onSurface}${opacity.alpha30}`,
-          width: 36,
-          height: 5,
-        }}
-        backgroundStyle={{
-          backgroundColor: colors.surface,
-          borderTopLeftRadius: 22,
-          borderTopRightRadius: 22,
-        }}
+        {...sheetChrome.modalProps}
       >
-        <BottomSheetScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{
-            paddingHorizontal: spacing.xxl,
-            paddingTop: spacing.xxl,
-            paddingBottom: spacing.xxl + insets.bottom,
-            gap: spacing.md,
-          }}
-        >
-          <Text
-            variant="titleMedium"
-            style={{
-              color: colors.onSurface,
-              textAlign: 'center',
-              fontWeight: '600',
+        <SheetTheme theme={theme}>
+          <BottomSheetScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{
+              paddingHorizontal: spacing.xxl,
+              paddingTop: spacing.xs,
+              paddingBottom: spacing.xxl + insets.bottom,
+              gap: spacing.xxl,
             }}
           >
-            Invite member
-          </Text>
-          {collaborationLoading || !collaboration ? (
-            <Surface
-              elevation={elevation.level1}
-              style={{
-                padding: spacing.xxl,
-                borderRadius: shapes.cornerLarge,
-                backgroundColor: surfaces.card,
-              }}
-            >
-              <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-                Loading plan and sharing access...
-              </Text>
-            </Surface>
-          ) : planSupportsSharing === false ? (
-            <Surface
-              elevation={elevation.level1}
-              style={{
-                padding: spacing.xxl,
-                borderRadius: shapes.cornerLarge,
-                backgroundColor: surfaces.card,
-                gap: spacing.sm,
-              }}
-            >
-              <Text variant="titleSmall" style={{ color: colors.onSurface }}>
-                Home sharing is not available on your current plan.
-              </Text>
-              <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-                Upgrade your plan to invite members to this house.
-              </Text>
-            </Surface>
-          ) : (
-            <Surface
-              elevation={elevation.level1}
-              style={{
-                padding: spacing.xxl,
-                borderRadius: shapes.cornerLarge,
-                backgroundColor: surfaces.card,
-                gap: spacing.lg,
-              }}
-            >
-              {latestInviteCode ? (
-                <Surface
-                  elevation={elevation.level1}
-                  style={{
-                    borderRadius: shapes.cornerLarge,
-                    backgroundColor: surfaces.cardLow,
-                    padding: spacing.lg,
-                    gap: spacing.sm,
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text variant="labelLarge" style={{ color: colors.onSurface }}>
-                      Invitation code
-                    </Text>
-                    <IconButton
-                      icon="share-variant"
-                      onPress={() => void handleShareLatestInvite()}
-                      iconColor={colors.primary}
-                      size={20}
-                    />
-                  </View>
-                  <Text variant="titleMedium" style={{ color: colors.onSurface, fontWeight: '700' }}>
+            <SheetHeader
+              title="Invite member"
+              onClose={() => inviteSheetRef.current?.dismiss()}
+              closeLabel="Close invite"
+            />
+            {collaborationLoading || !collaboration ? (
+              <SheetCard>
+                <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
+                  Loading plan and sharing access...
+                </Text>
+              </SheetCard>
+            ) : planSupportsSharing === false ? (
+              <SheetNotice tone="info">
+                Home sharing is not available on your current plan. Upgrade your plan to invite members to this house.
+              </SheetNotice>
+            ) : latestInviteCode ? (
+              <>
+                <SheetCard label="Invitation code">
+                  <Text
+                    variant="headlineSmall"
+                    selectable
+                    style={{ color: colors.onSurface, fontWeight: '700', letterSpacing: 2, textAlign: 'center' }}
+                  >
                     {latestInviteCode}
                   </Text>
-                  <Text variant="bodySmall" style={{ color: colors.onSurfaceVariant }}>
+                  <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant, textAlign: 'center' }}>
                     Share this code to invite {latestInviteRole ?? 'member'} to your house.
                   </Text>
-                </Surface>
-              ) : (
-                <>
-                  <TextInput
-                    mode="outlined"
-                    label="Member name"
-                    value={inviteeName}
-                    onChangeText={setInviteeName}
-                    autoCapitalize="words"
-                    outlineColor={colors.outline}
-                    activeOutlineColor={colors.primary}
-                    textColor={colors.onSurface}
+                </SheetCard>
+                <View style={{ flexDirection: 'row' }}>
+                  <SheetButton
+                    icon="share-variant"
+                    label="Share code"
+                    onPress={() => void handleShareLatestInvite()}
                   />
-                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                    {(['viewer', 'editor', 'admin'] as InviteRole[]).map((role) => (
-                      <Button
-                        key={role}
-                        mode="contained-tonal"
-                        onPress={() => setInviteRole(role)}
-                        buttonColor={inviteRole === role ? colors.primaryContainer : surfaces.cardLow}
-                        textColor={inviteRole === role ? colors.onPrimaryContainer : colors.onSurface}
-                        compact
-                        style={{ borderRadius: shapes.cornerFull, flex: 1, minWidth: 0 }}
-                      >
-                        {role}
-                      </Button>
-                    ))}
-                  </View>
-                  <Button
-                    mode="contained-tonal"
-                    onPress={() => void handleCreateInvite()}
-                    loading={inviteCreateLoading}
-                    disabled={!inviteeName.trim()}
-                    buttonColor={colors.primaryContainer}
-                    textColor={colors.onPrimaryContainer}
-                    contentStyle={{ paddingVertical: spacing.sm }}
-                    style={{ borderRadius: shapes.cornerFull }}
+                </View>
+              </>
+            ) : (
+              <>
+                <TextInput
+                  mode="outlined"
+                  label="Member name"
+                  value={inviteeName}
+                  onChangeText={setInviteeName}
+                  autoCapitalize="words"
+                  outlineColor={colors.outline}
+                  activeOutlineColor={colors.primary}
+                  textColor={colors.onSurface}
+                  style={{ backgroundColor: sheetChrome.sheetBackground }}
+                />
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="labelLarge" style={{ color: colors.onSurfaceVariant }}>
+                    Role
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      padding: spacing.xxs,
+                      gap: spacing.xxs,
+                      borderRadius: shapes.cornerFull,
+                      backgroundColor: sheetChrome.cardBackground,
+                      borderWidth: 1,
+                      borderColor: sheetChrome.hairline,
+                    }}
                   >
-                    Create invitation
-                  </Button>
-                </>
-              )}
-            </Surface>
-          )}
-        </BottomSheetScrollView>
+                    {(['viewer', 'editor', 'admin'] as InviteRole[]).map((role) => {
+                      const selected = inviteRole === role;
+                      return (
+                        <Pressable
+                          key={role}
+                          onPress={() => setInviteRole(role)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Invite as ${role}`}
+                          accessibilityState={{ selected }}
+                          style={{
+                            flex: 1,
+                            minHeight: 40,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: shapes.cornerFull,
+                            backgroundColor: selected ? colors.primaryContainer : 'transparent',
+                          }}
+                        >
+                          <Text
+                            variant="labelLarge"
+                            style={{
+                              color: selected ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                              fontWeight: selected ? '600' : '400',
+                              textTransform: 'capitalize',
+                            }}
+                          >
+                            {role}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row' }}>
+                  <SheetButton
+                    icon="account-plus-outline"
+                    label="Create invitation"
+                    loading={inviteCreateLoading}
+                    disabled={!inviteeName.trim() || inviteCreateLoading}
+                    onPress={() => void handleCreateInvite()}
+                  />
+                </View>
+              </>
+            )}
+          </BottomSheetScrollView>
+        </SheetTheme>
       </BottomSheetModal>
 
       <BottomSheetModal
@@ -3604,99 +3580,54 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         onChange={setManageMemberSheetIndex}
         onDismiss={() => setManagedMember(null)}
         backdropComponent={renderInviteSheetBackdrop}
-        handleStyle={{ paddingTop: spacing.xs }}
-        handleIndicatorStyle={{
-          backgroundColor: `${colors.onSurface}${opacity.alpha30}`,
-          width: 36,
-          height: 5,
-        }}
-        backgroundStyle={{
-          backgroundColor: colors.surface,
-          borderTopLeftRadius: 22,
-          borderTopRightRadius: 22,
-        }}
+        {...sheetChrome.modalProps}
       >
-        <BottomSheetScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{
-            paddingHorizontal: spacing.xxl,
-            paddingTop: spacing.xxl,
-            paddingBottom: spacing.xxl + insets.bottom,
-            gap: spacing.md,
-          }}
-        >
-          <Text
-            variant="titleMedium"
-            style={{
-              color: colors.onSurface,
-              textAlign: 'center',
-              fontWeight: '600',
+        <SheetTheme theme={theme}>
+          <BottomSheetScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{
+              paddingHorizontal: spacing.xxl,
+              paddingTop: spacing.xs,
+              paddingBottom: spacing.xxl + insets.bottom,
+              gap: spacing.xxl,
             }}
           >
-            Manage member
-          </Text>
-          <Surface
-            elevation={elevation.level1}
-            style={{
-              padding: spacing.xxl,
-              borderRadius: shapes.cornerLarge,
-              backgroundColor: surfaces.card,
-              gap: spacing.md,
-            }}
-          >
-            <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-              {managedMember?.label ?? 'Member'}
-            </Text>
-            <Button
-              mode="contained-tonal"
-              onPress={() => void handleSetManagedMemberRole('admin')}
-              buttonColor={colors.primaryContainer}
-              textColor={colors.onPrimaryContainer}
-              contentStyle={{ paddingVertical: spacing.sm }}
-              style={{ borderRadius: shapes.cornerFull }}
-            >
-              Set admin
-            </Button>
-            <Button
-              mode="contained-tonal"
-              onPress={() => void handleSetManagedMemberRole('editor')}
-              buttonColor={colors.primaryContainer}
-              textColor={colors.onPrimaryContainer}
-              contentStyle={{ paddingVertical: spacing.sm }}
-              style={{ borderRadius: shapes.cornerFull }}
-            >
-              Set editor
-            </Button>
-            <Button
-              mode="contained-tonal"
-              onPress={() => void handleSetManagedMemberRole('viewer')}
-              buttonColor={colors.primaryContainer}
-              textColor={colors.onPrimaryContainer}
-              contentStyle={{ paddingVertical: spacing.sm }}
-              style={{ borderRadius: shapes.cornerFull }}
-            >
-              Set viewer
-            </Button>
-            <Button
-              mode="contained-tonal"
-              onPress={() => void handleRemoveManagedMember()}
-              buttonColor={colors.errorContainer}
-              textColor={colors.onErrorContainer}
-              contentStyle={{ paddingVertical: spacing.sm }}
-              style={{ borderRadius: shapes.cornerFull }}
-            >
-              Remove member
-            </Button>
-            <Button
-              mode="outlined"
-              onPress={() => manageMemberSheetRef.current?.dismiss()}
-              contentStyle={{ paddingVertical: spacing.sm }}
-              style={{ borderRadius: shapes.cornerFull }}
-            >
-              Close
-            </Button>
-          </Surface>
-        </BottomSheetScrollView>
+            <SheetHeader
+              title="Manage member"
+              subtitle={managedMember?.label ?? 'Member'}
+              onClose={() => manageMemberSheetRef.current?.dismiss()}
+              closeLabel="Close manage member"
+            />
+            <SheetCard label="Change role">
+              <SheetRow
+                icon="shield-account-outline"
+                title="Admin"
+                accessibilityLabel="Set admin"
+                onPress={() => void handleSetManagedMemberRole('admin')}
+              />
+              <SheetRow
+                icon="pencil-outline"
+                title="Editor"
+                accessibilityLabel="Set editor"
+                onPress={() => void handleSetManagedMemberRole('editor')}
+              />
+              <SheetRow
+                icon="eye-outline"
+                title="Viewer"
+                accessibilityLabel="Set viewer"
+                onPress={() => void handleSetManagedMemberRole('viewer')}
+              />
+            </SheetCard>
+            <View style={{ flexDirection: 'row' }}>
+              <SheetButton
+                variant="danger"
+                icon="account-remove-outline"
+                label="Remove member"
+                onPress={() => void handleRemoveManagedMember()}
+              />
+            </View>
+          </BottomSheetScrollView>
+        </SheetTheme>
       </BottomSheetModal>
 
       {shouldRenderFabOverlay ? renderFabOverlay(
