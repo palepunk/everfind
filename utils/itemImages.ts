@@ -1,6 +1,5 @@
 import { Q } from '@/utils/storage/query'
 import { database } from './storage/database'
-import { loadPowerSyncReadModeEnabled } from './powersync/readMode'
 import { getPowerSyncRepositoryItemImages } from './powersync/repository'
 
 export type ItemImageRecord = {
@@ -39,15 +38,7 @@ export const getItemImages = async (itemId: string): Promise<ItemImageRecord[]> 
 }
 
 export const getItemImageCount = async (itemId: string) => {
-  if (await loadPowerSyncReadModeEnabled()) {
-    return (await getPowerSyncRepositoryItemImages(undefined, itemId)).length
-  }
-
-  const records = await database.collections
-    .get<any>('item_images')
-    .query(Q.where('item_id', itemId))
-    .fetch()
-  return records.length
+  return (await getPowerSyncRepositoryItemImages(undefined, itemId)).length
 }
 
 export const syncItemCoverImage = async (itemId: string) => {

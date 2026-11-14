@@ -10,9 +10,6 @@ const { createDatabaseMock } = require('./helpers/createDatabaseMock');
 const settingsMetadataPath = path.resolve(__dirname, '../utils/sync/settingsMetadata.ts');
 
 const createPowerSyncMocks = (houseIds = []) => ({
-  '@/utils/powersync/readMode': {
-    loadPowerSyncReadModeEnabled: async () => houseIds.length > 0,
-  },
   '@/utils/powersync/system': {
     getPowerSyncDatabase: () => ({
       waitForReady: async () => {},

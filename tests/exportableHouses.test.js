@@ -9,25 +9,11 @@ const exportableHousesPath = path.resolve(__dirname, '../utils/export/exportable
 
 test('PowerSync local houses are exportable even when signed in', async () => {
   const { getExportableHouses } = loadWithMocks(exportableHousesPath, {
-    '../storage/database': {
-      database: {
-        collections: {
-          get: () => ({
-            query: () => ({
-              fetch: async () => [],
-            }),
-          }),
-        },
-      },
-    },
     '../collaboration/houseSharing': {
       getHouseCollaboration: async () => ({
         my_role: 'viewer',
         permissions: { can_admin: false },
       }),
-    },
-    '../powersync/readMode': {
-      loadPowerSyncReadModeEnabled: async () => true,
     },
     '../powersync/repository': {
       getPowerSyncRepositoryHouses: async () => [

@@ -3,26 +3,22 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const { loadWithMocks } = require('./helpers/moduleMocks');
-const { createDatabaseMock } = require('./helpers/createDatabaseMock');
+
+const createRepositoryMock = (data = {}) => ({
+  getPowerSyncRepositoryBoxes: async () => data.boxes ?? [],
+  getPowerSyncRepositoryContainers: async () => data.containers ?? [],
+  getPowerSyncRepositoryHouses: async () => data.houses ?? [],
+  getPowerSyncRepositoryItems: async () => data.items ?? [],
+  getPowerSyncRepositoryRooms: async () => data.rooms ?? [],
+});
 
 const limitsPath = path.resolve(__dirname, '../utils/limits.ts');
 
 const loadLimitsWithLocalData = (initialData) =>
   loadWithMocks(limitsPath, {
-    './storage/database': { database: createDatabaseMock(initialData) },
-    './storage/models': {},
+    './powersync/repository': createRepositoryMock(initialData),
     './itemImages': {
       getItemImageCount: async () => 999,
-    },
-    './powersync/readMode': {
-      loadPowerSyncReadModeEnabled: async () => false,
-    },
-    './powersync/repository': {
-      getPowerSyncRepositoryBoxes: async () => [],
-      getPowerSyncRepositoryContainers: async () => [],
-      getPowerSyncRepositoryHouses: async () => [],
-      getPowerSyncRepositoryItems: async () => [],
-      getPowerSyncRepositoryRooms: async () => [],
     },
     './edition/planLimits': {
       getFallbackPlanLimitInfo: (limits) => ({ planId: 'foss', limits }),
@@ -65,20 +61,9 @@ test('FOSS plan limits are unlimited when no remote plan data exists', async () 
 
 test('finite remote plan limits still block cloud-only caps', async () => {
   const limits = loadWithMocks(limitsPath, {
-    './storage/database': { database: createDatabaseMock() },
-    './storage/models': {},
+    './powersync/repository': createRepositoryMock(),
     './itemImages': {
       getItemImageCount: async () => 1,
-    },
-    './powersync/readMode': {
-      loadPowerSyncReadModeEnabled: async () => false,
-    },
-    './powersync/repository': {
-      getPowerSyncRepositoryBoxes: async () => [],
-      getPowerSyncRepositoryContainers: async () => [],
-      getPowerSyncRepositoryHouses: async () => [],
-      getPowerSyncRepositoryItems: async () => [],
-      getPowerSyncRepositoryRooms: async () => [],
     },
     './edition/planLimits': {
       getFallbackPlanLimitInfo: (limits) => ({ planId: 'foss', limits }),
@@ -111,28 +96,15 @@ test('finite remote plan limits still block cloud-only caps', async () => {
 
 test('edition fallback can provide finite plan limits when remote plan data is unavailable', async () => {
   const limits = loadWithMocks(limitsPath, {
-    './storage/database': {
-      database: createDatabaseMock({
-        houses: [{ id: 'house-1' }, { id: 'house-2' }],
-        rooms: [{ id: 'room-1' }],
-        containers: [{ id: 'container-1' }],
-        boxes: [],
-        items: Array.from({ length: 400 }, (_, index) => ({ id: `item-${index}` })),
-      }),
-    },
-    './storage/models': {},
+    './powersync/repository': createRepositoryMock({
+      houses: [{ id: 'house-1' }, { id: 'house-2' }],
+      rooms: [{ id: 'room-1' }],
+      containers: [{ id: 'container-1' }],
+      boxes: [],
+      items: Array.from({ length: 400 }, (_, index) => ({ id: `item-${index}` })),
+    }),
     './itemImages': {
       getItemImageCount: async () => 1,
-    },
-    './powersync/readMode': {
-      loadPowerSyncReadModeEnabled: async () => false,
-    },
-    './powersync/repository': {
-      getPowerSyncRepositoryBoxes: async () => [],
-      getPowerSyncRepositoryContainers: async () => [],
-      getPowerSyncRepositoryHouses: async () => [],
-      getPowerSyncRepositoryItems: async () => [],
-      getPowerSyncRepositoryRooms: async () => [],
     },
     './edition/planLimits': {
       getFallbackPlanLimitInfo: () => ({

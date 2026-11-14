@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { database } from '@/utils/storage/database';
 import { safeGetSession } from '@/utils/auth/session';
-import { loadPowerSyncReadModeEnabled } from '@/utils/powersync/readMode';
 import { getPowerSyncDatabase } from '@/utils/powersync/system';
 import { markPowerSyncHousesSynced } from '@/utils/powersync/metadata';
 
@@ -174,7 +173,6 @@ const loadAllLocalHouseIds = async (): Promise<string[]> => {
 
 const loadVisiblePowerSyncHouseIds = async (): Promise<string[]> => {
   try {
-    if (!(await loadPowerSyncReadModeEnabled())) return [];
     const powerSyncDatabase = getPowerSyncDatabase();
     await powerSyncDatabase.waitForReady();
     const rows = await powerSyncDatabase.getAll<{ id: string }>('SELECT id FROM houses');

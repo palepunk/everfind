@@ -14,11 +14,8 @@ import Voice from '@/utils/voice';
 import { router, useLocalSearchParams } from 'expo-router';
 import { activateKeepAwake, deactivateKeepAwake } from 'expo-keep-awake';
 
-import { database } from '@/utils/storage/database';
-import { Box, Container, House, Item, Room } from '@/utils/storage/models';
 import { triggerGlobalRefresh } from '@/utils/hooks/useDatabase';
 import { createPowerSyncLocalItem } from '@/utils/powersync/mutations';
-import { usePowerSyncReadModeEnabled } from '@/utils/powersync/readMode';
 import {
   getPowerSyncRepositoryBoxes,
   getPowerSyncRepositoryContainers,
@@ -84,7 +81,6 @@ export function VoiceBulkAddScreen() {
   const [hasStartedCapture, setHasStartedCapture] = useState(false);
   const [hasStoppedListeningOnce, setHasStoppedListeningOnce] = useState(false);
   const { language: speechLanguage, setLanguage: setSpeechLanguage } = useSpeechLanguage();
-  const powerSyncReadModeEnabled = usePowerSyncReadModeEnabled();
   const resolvedLanguage = speechLanguage === 'system' ? '' : speechLanguage;
 
   const desiredListeningRef = useRef(false);
@@ -158,87 +154,38 @@ export function VoiceBulkAddScreen() {
     }
 
     try {
-      if (powerSyncReadModeEnabled) {
-        const [houses, rooms, containers, boxes] = await Promise.all([
-          getPowerSyncRepositoryHouses(),
-          getPowerSyncRepositoryRooms(),
-          getPowerSyncRepositoryContainers(),
-          getPowerSyncRepositoryBoxes(),
-        ]);
-
-        if (rawParentType === 'container') {
-          const container = containers.find((candidate) => candidate.id === rawParentId);
-          if (!container) throw new Error('PowerSync container not found.');
-          const room = rooms.find((candidate) => candidate.id === container.roomId);
-          const house = houses.find((candidate) => candidate.id === container.houseId);
-          setParentInfo({
-            houseId: container.houseId,
-            title: container.name,
-            location: [house?.name, room?.name, container.name].filter(Boolean).join(' > '),
-            parentType: 'container',
-            parentId: container.id,
-          });
-        } else if (rawParentType === 'box') {
-          const box = boxes.find((candidate) => candidate.id === rawParentId);
-          if (!box) throw new Error('PowerSync box not found.');
-          const house = houses.find((candidate) => candidate.id === box.houseId);
-          const parts = [house?.name];
-
-          if (box.parentType === 'container' && box.parentId) {
-            const container = containers.find((candidate) => candidate.id === box.parentId);
-            const room = container?.roomId ? rooms.find((candidate) => candidate.id === container.roomId) : null;
-            parts.push(room?.name, container?.name);
-          } else if (box.parentType === 'room' && box.parentId) {
-            const room = rooms.find((candidate) => candidate.id === box.parentId);
-            parts.push(room?.name);
-          }
-          parts.push(box.name);
-
-          setParentInfo({
-            houseId: box.houseId,
-            title: box.name,
-            location: parts.filter(Boolean).join(' > '),
-            parentType: 'box',
-            parentId: box.id,
-          });
-        } else {
-          const room = rooms.find((candidate) => candidate.id === rawParentId);
-          if (!room) throw new Error('PowerSync room not found.');
-          const house = houses.find((candidate) => candidate.id === room.houseId);
-          setParentInfo({
-            houseId: room.houseId,
-            title: room.name,
-            location: [house?.name, room.name].filter(Boolean).join(' > '),
-            parentType: 'room',
-            parentId: room.id,
-          });
-        }
-        return;
-      }
+      const [houses, rooms, containers, boxes] = await Promise.all([
+        getPowerSyncRepositoryHouses(),
+        getPowerSyncRepositoryRooms(),
+        getPowerSyncRepositoryContainers(),
+        getPowerSyncRepositoryBoxes(),
+      ]);
 
       if (rawParentType === 'container') {
-        const container = await database.collections.get<Container>('containers').find(rawParentId);
-        const room = await database.collections.get<Room>('rooms').find(container.roomId);
-        const house = await database.collections.get<House>('houses').find(container.houseId);
+        const container = containers.find((candidate) => candidate.id === rawParentId);
+        if (!container) throw new Error('PowerSync container not found.');
+        const room = rooms.find((candidate) => candidate.id === container.roomId);
+        const house = houses.find((candidate) => candidate.id === container.houseId);
         setParentInfo({
           houseId: container.houseId,
           title: container.name,
-          location: [house.name, room.name, container.name].filter(Boolean).join(' > '),
+          location: [house?.name, room?.name, container.name].filter(Boolean).join(' > '),
           parentType: 'container',
           parentId: container.id,
         });
       } else if (rawParentType === 'box') {
-        const box = await database.collections.get<Box>('boxes').find(rawParentId);
-        const house = await database.collections.get<House>('houses').find(box.houseId);
-        const parts = [house.name];
+        const box = boxes.find((candidate) => candidate.id === rawParentId);
+        if (!box) throw new Error('PowerSync box not found.');
+        const house = houses.find((candidate) => candidate.id === box.houseId);
+        const parts = [house?.name];
 
         if (box.parentType === 'container' && box.parentId) {
-          const container = await database.collections.get<Container>('containers').find(box.parentId);
-          const room = await database.collections.get<Room>('rooms').find(container.roomId);
-          parts.push(room.name, container.name);
+          const container = containers.find((candidate) => candidate.id === box.parentId);
+          const room = container?.roomId ? rooms.find((candidate) => candidate.id === container.roomId) : null;
+          parts.push(room?.name, container?.name);
         } else if (box.parentType === 'room' && box.parentId) {
-          const room = await database.collections.get<Room>('rooms').find(box.parentId);
-          parts.push(room.name);
+          const room = rooms.find((candidate) => candidate.id === box.parentId);
+          parts.push(room?.name);
         }
         parts.push(box.name);
 
@@ -250,12 +197,13 @@ export function VoiceBulkAddScreen() {
           parentId: box.id,
         });
       } else {
-        const room = await database.collections.get<Room>('rooms').find(rawParentId);
-        const house = await database.collections.get<House>('houses').find(room.houseId);
+        const room = rooms.find((candidate) => candidate.id === rawParentId);
+        if (!room) throw new Error('PowerSync room not found.');
+        const house = houses.find((candidate) => candidate.id === room.houseId);
         setParentInfo({
           houseId: room.houseId,
           title: room.name,
-          location: [house.name, room.name].filter(Boolean).join(' > '),
+          location: [house?.name, room.name].filter(Boolean).join(' > '),
           parentType: 'room',
           parentId: room.id,
         });
@@ -266,7 +214,7 @@ export function VoiceBulkAddScreen() {
     } finally {
       setLoading(false);
     }
-  }, [parentId, parentType, powerSyncReadModeEnabled]);
+  }, [parentId, parentType]);
 
   useEffect(() => {
     loadParentInfo();
@@ -524,47 +472,20 @@ export function VoiceBulkAddScreen() {
         return;
       }
 
-      if (powerSyncReadModeEnabled) {
-        for (const name of recognizedItems) {
-          await createPowerSyncLocalItem({
-            houseId: parentInfo.houseId,
-            name: name.trim(),
-            description: null,
-            parentType: parentInfo.parentType,
-            parentId: parentInfo.parentId,
-            imagePath: null,
-            tags: '',
-            purchasePriceCents: null,
-            notes: null,
-          });
-        }
-        triggerGlobalRefresh();
-        trackRecordCreated('item', { source: 'voice_bulk', count: recognizedItems.length });
-        if (parentInfo.parentType === 'container') {
-          router.replace(`/containers/${parentInfo.parentId}?entry=direct` as any);
-        } else if (parentInfo.parentType === 'box') {
-          router.replace(`/boxes/${parentInfo.parentId}?entry=direct` as any);
-        } else {
-          router.replace(`/rooms/${parentInfo.parentId}?entry=direct` as any);
-        }
-        return;
+      for (const name of recognizedItems) {
+        await createPowerSyncLocalItem({
+          houseId: parentInfo.houseId,
+          name: name.trim(),
+          description: null,
+          parentType: parentInfo.parentType,
+          parentId: parentInfo.parentId,
+          imagePath: null,
+          tags: '',
+          purchasePriceCents: null,
+          notes: null,
+        });
       }
-
-      await database.write(async () => {
-        for (const name of recognizedItems) {
-          await database.collections.get<Item>('items').create((item) => {
-            item.houseId = parentInfo.houseId;
-            item.name = name.trim();
-            item.description = null;
-            item.parentType = parentInfo.parentType;
-            item.parentId = parentInfo.parentId;
-            item.imagePath = null;
-            item.tags = '';
-            item.purchasePriceCents = null;
-            item.notes = null;
-          });
-        }
-      });
+      triggerGlobalRefresh();
       trackRecordCreated('item', { source: 'voice_bulk', count: recognizedItems.length });
       if (parentInfo.parentType === 'container') {
         router.replace(`/containers/${parentInfo.parentId}?entry=direct` as any);
@@ -589,7 +510,7 @@ export function VoiceBulkAddScreen() {
     } finally {
       setSaving(false);
     }
-  }, [parentInfo, powerSyncReadModeEnabled, recognizedItems]);
+  }, [parentInfo, recognizedItems]);
 
   const footerDisabled = !speechAvailable || saving || loading || !parentInfo;
   const recognizedCount = recognizedItems.length;

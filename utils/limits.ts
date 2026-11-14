@@ -1,7 +1,4 @@
-import { database } from './storage/database';
-import { Box, Container, House, Item, Room } from './storage/models';
 import { getItemImageCount } from './itemImages';
-import { loadPowerSyncReadModeEnabled } from './powersync/readMode';
 import {
   getPowerSyncRepositoryBoxes,
   getPowerSyncRepositoryContainers,
@@ -71,28 +68,12 @@ const toUsageValues = (value: any): LimitCounts => ({
 });
 
 const getLocalLimitCounts = async (): Promise<LimitCounts> => {
-  if (await loadPowerSyncReadModeEnabled()) {
-    const [houses, rooms, containers, boxes, items] = await Promise.all([
-      getPowerSyncRepositoryHouses(),
-      getPowerSyncRepositoryRooms(),
-      getPowerSyncRepositoryContainers(),
-      getPowerSyncRepositoryBoxes(),
-      getPowerSyncRepositoryItems(),
-    ]);
-
-    return {
-      houses: houses.length,
-      storageUnits: rooms.length + containers.length + boxes.length,
-      items: items.length,
-    };
-  }
-
   const [houses, rooms, containers, boxes, items] = await Promise.all([
-    database.collections.get<House>('houses').query().fetch(),
-    database.collections.get<Room>('rooms').query().fetch(),
-    database.collections.get<Container>('containers').query().fetch(),
-    database.collections.get<Box>('boxes').query().fetch(),
-    database.collections.get<Item>('items').query().fetch(),
+    getPowerSyncRepositoryHouses(),
+    getPowerSyncRepositoryRooms(),
+    getPowerSyncRepositoryContainers(),
+    getPowerSyncRepositoryBoxes(),
+    getPowerSyncRepositoryItems(),
   ]);
 
   return {
