@@ -33,8 +33,18 @@ export const connectPowerSyncForCurrentUser = async () => {
   return database;
 };
 
-export const disconnectPowerSync = async (options?: { clearLocal?: boolean }) => {
+export const disconnectPowerSync = async (options?: {
+  /** Clears synced tables, the upload queue, and local-only tables. */
+  clearLocal?: boolean;
+  /** Clears synced tables and the upload queue; local-only tables are preserved. */
+  clearSynced?: boolean;
+}) => {
   if (!powerSyncDatabase) return;
+
+  if (options?.clearSynced && !options.clearLocal) {
+    await powerSyncDatabase.disconnectAndClear({ clearLocal: false });
+    return;
+  }
 
   if (options?.clearLocal) {
     await powerSyncDatabase.disconnectAndClear();
