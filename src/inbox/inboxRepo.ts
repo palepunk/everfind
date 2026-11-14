@@ -31,7 +31,7 @@ export function observePendingNewestCreatedAt(): Observable<number | null> {
   return inboxCollection()
     .query(Q.where('status', Q.notEq('applied')), Q.sortBy('created_at', Q.desc))
     .observe()
-    .pipe(map((rows) => rows[0]?.createdAt ?? null));
+    .pipe(map((rows: any[]) => rows[0]?.createdAt ?? null));
 }
 
 export async function fetchToReview(): Promise<InboxEntry[]> {

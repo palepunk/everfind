@@ -9,6 +9,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { FullWindowOverlay } from 'react-native-screens';
 import { Q } from '@/utils/storage/query';
+import type { TableName } from '@/utils/storage/database';
 import {
   SheetButton,
   SheetCard,
@@ -404,13 +405,13 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     try {
       const powerSyncEntity = await loadPowerSyncEntity();
       if (powerSyncEntity) {
-        setEntity(powerSyncEntity as LoadedEntity<T>);
+        setEntity(powerSyncEntity as unknown as LoadedEntity<T>);
         setSelectedHouseId((powerSyncEntity as any).houseId || '');
         setEntityRevision((prev) => prev + 1);
         return;
       }
 
-      const record = await database.collections.get<any>(config.collection).find(entityId);
+      const record = await database.collections.get<any>(config.collection as TableName).find(entityId);
       setEntity(record);
       setSelectedHouseId((record as any).houseId || '');
       setEntityRevision((prev) => prev + 1);
@@ -425,7 +426,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     try {
       let localRecord: any = null;
       try {
-        localRecord = await database.collections.get<any>(config.collection).find(entityId);
+        localRecord = await database.collections.get<any>(config.collection as TableName).find(entityId);
       } catch {
         localRecord = null;
       }
@@ -446,7 +447,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
                 remotePath: record.remotePath ?? null,
                 position: record.position ?? null,
               }))
-              .sort((left, right) => {
+              .sort((left: any, right: any) => {
                 const leftPosition = typeof left.position === 'number' ? left.position : 0;
                 const rightPosition = typeof right.position === 'number' ? right.position : 0;
                 if (leftPosition !== rightPosition) {
@@ -977,13 +978,13 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
   );
 
   const childSections = useMemo(() => {
-    if (!entityId) return [] as { type: EntityType; items: ChildSectionItem[] }[];
+    if (!entityId) return [] as { type: EntityType; label: string; icon: string; items: ChildSectionItem[] }[];
 
     return (config.children || []).map((child) => ({
       type: child.type,
       label: child.label,
       icon: child.icon,
-      items: childItemsByType[child.type] || [],
+      items: childItemsByType[child.type as keyof typeof childItemsByType] || [],
     }));
   }, [childItemsByType, config.children, entityId]);
 
@@ -1111,7 +1112,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     const load = async () => {
       try {
         if (!isAddMode && entityId) {
-          const record = (await loadPowerSyncEntity()) ?? await database.collections.get<any>(config.collection).find(entityId);
+          const record = (await loadPowerSyncEntity()) ?? await database.collections.get<any>(config.collection as TableName).find(entityId);
           setEntity(record);
 
           if (isEditMode) {
@@ -1547,7 +1548,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         notes: (entity as any).notes ?? null,
         syncImageStorage: false,
       });
-      setEntity(updated as LoadedEntity<T>);
+      setEntity(updated as unknown as LoadedEntity<T>);
       return updated;
     },
     [config.type, entity, entityId]
@@ -1955,12 +1956,12 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         trackRecordCreated(contextualCreateType, { source: 'form' });
         closeContextualCreateSheet();
         triggerGlobalRefresh();
-        router.push(`/${toRouteSegment(contextualCreateType)}/${created.id}`);
+        router.push(`/${toRouteSegment(contextualCreateType)}/${created.id}` as any);
         return;
       }
 
       const created = await database.write(async () =>
-        database.collections.get<any>(contextualCreateConfig.collection).create((record: any) => {
+        database.collections.get<any>(contextualCreateConfig.collection as TableName).create((record: any) => {
           contextualCreateConfig.fields.forEach((field) => {
             const value = contextualCreateValues[String(field.key)]?.trim() || '';
             if (field.key === 'purchasePrice') {
@@ -2015,7 +2016,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
 
       trackRecordCreated(contextualCreateType, { source: 'form' });
       closeContextualCreateSheet();
-      router.push(`/${toRouteSegment(contextualCreateType)}/${created.id}`);
+      router.push(`/${toRouteSegment(contextualCreateType)}/${created.id}` as any);
     } catch (e: any) {
       const errorCode = e?.message;
       if (
@@ -2178,11 +2179,11 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         if (config.type === 'item' && createModeItemImages.length) {
           await assertCanSetItemPictureCount(createModeItemImages.length);
           for (const [index, currentImagePath] of createModeItemImages.entries()) {
-            await addItemImage(created.id, created.houseId, currentImagePath, index);
+            await addItemImage(created.id, (created as any).houseId, currentImagePath, index);
           }
         }
 
-        setEntity(created as LoadedEntity<T>);
+        setEntity(created as unknown as LoadedEntity<T>);
         setSelectedHouseId((created as any).houseId || selectedHouseId);
         if (config.type !== 'item') {
           setImagePath((created as any).imagePath ?? imagePath ?? null);
@@ -2191,7 +2192,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         trackRecordCreated(config.type, { source: 'form' });
         triggerGlobalRefresh();
         router.replace({
-          pathname: `/${entityRouteSegment}/[id]`,
+          pathname: `/${entityRouteSegment}/[id]` as any,
           params: {
             id: created.id,
             ...(entry === 'direct' ? { entry: 'direct' } : {}),
@@ -2285,7 +2286,9 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     if (!entityId) return [];
     if (!canWriteContent) return [];
 
-    const actions = (config.children || []).map((child) => ({
+    const actions: { key: string; label: string; icon: string; onPress: () => void }[] = (
+      config.children || []
+    ).map((child) => ({
       key: child.type,
       label: `Add ${child.label.endsWith('es') ? child.label.slice(0, -2) : child.label.endsWith('s') ? child.label.slice(0, -1) : child.label}`,
       icon: child.icon,
@@ -3035,7 +3038,8 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         <Appbar.BackAction onPress={handleBack} />
         <Appbar.Content
           style={{ alignItems: 'flex-start' }}
-          titleStyle={{ textAlign: 'left' }}
+          // Paper's types only allow titleStyle with a string title; the title here can be an element.
+          {...({ titleStyle: { textAlign: 'left' } } as object)}
           title={
             isFormMode ? (
               renderTitle()
@@ -3069,7 +3073,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
             {canModifyCurrentEntity ? (
               <Appbar.Action
                 icon="pencil"
-                onPress={() => router.push(`/${entityRouteSegment}/${id}?mode=edit`)}
+                onPress={() => router.push(`/${entityRouteSegment}/${id}?mode=edit` as any)}
                 accessibilityLabel={`Edit ${config.title}`}
                 testID={`entity-edit-${config.type}-button`}
               />
@@ -3105,7 +3109,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
               }
               openContextualCreateSheet(section.type);
             },
-            onPressItem: (childId: string) => router.push(`/${toRouteSegment(section.type)}/${childId}`),
+            onPressItem: (childId: string) => router.push(`/${toRouteSegment(section.type)}/${childId}` as any),
             onVoiceAdd:
               canWriteContent &&
               section.type === 'item' &&
@@ -3428,7 +3432,10 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
               <Text
                 variant="bodySmall"
                 selectable
-                style={{ color: colors.onSurfaceVariant, fontFamily: typography.monospace?.fontFamily }}
+                style={{
+                  color: colors.onSurfaceVariant,
+                  fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }),
+                }}
               >
                 {recordDiagnosticsLoading ? 'Loading...' : recordDiagnostics}
               </Text>

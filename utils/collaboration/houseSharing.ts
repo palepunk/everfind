@@ -71,7 +71,7 @@ export const createHouseInvitation = async (_params: {
   houseId: string;
   inviteeName: string;
   role: InviteRole;
-}) => {
+}): Promise<{ code: string; role: InviteRole }> => {
   throw unavailable();
 };
 export const revokeHouseInvitation = async (_invitationId: string) => {

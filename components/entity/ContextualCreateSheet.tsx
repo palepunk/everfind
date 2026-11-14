@@ -8,7 +8,7 @@ import type { AppTheme } from '@/utils/theme/theme';
 import { EntityForm } from './EntityForm';
 import type { EntityConfig, EntityType } from './entity.types';
 
-type ParentOptions = Record<EntityType, { id: string; name: string; location?: string }[]>;
+type ParentOptions = Partial<Record<EntityType, { id: string; name: string; location?: string }[]>>;
 
 type ContextualCreateSheetProps = {
   sheetRef: React.RefObject<BottomSheetModal | null>;

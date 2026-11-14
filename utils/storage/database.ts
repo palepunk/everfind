@@ -2,7 +2,7 @@ import { getPowerSyncDatabase } from '@/utils/powersync/system';
 import type { QueryCondition } from './query';
 import { Observable } from 'rxjs';
 
-type TableName =
+export type TableName =
   | 'houses'
   | 'rooms'
   | 'containers'

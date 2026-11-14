@@ -27,7 +27,7 @@ export const getItemImages = async (itemId: string): Promise<ItemImageRecord[]> 
     .query(Q.where('item_id', itemId))
     .fetch()
 
-  return sortByPosition(records).map((record) => ({
+  return sortByPosition<any>(records).map((record) => ({
     id: record.id,
     itemId: record.itemId,
     houseId: record.houseId,

@@ -335,15 +335,15 @@ export function VoiceBulkAddScreen() {
       }, 400);
     };
 
-    Voice.onSpeechPartialResults = (event) => {
+    Voice.onSpeechPartialResults = (event: any) => {
       handleTranscriptUpdate(event.value?.[0]);
       setSpeechStatus('listening');
     };
-    Voice.onSpeechResults = (event) => {
+    Voice.onSpeechResults = (event: any) => {
       handleTranscriptUpdate(event.value?.[0]);
       setSpeechStatus('processing');
     };
-    Voice.onSpeechError = (event) => {
+    Voice.onSpeechError = (event: any) => {
       console.warn('Speech error', event.error);
       if (desiredListeningRef.current) {
         restartListening();

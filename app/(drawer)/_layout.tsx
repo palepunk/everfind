@@ -98,7 +98,7 @@ function CustomDrawerContent(props: any) {
   };
 
   const handleNavigate = (path: string) => {
-    router.push(path);
+    router.push(path as any);
     props.navigation.closeDrawer();
   };
 
@@ -270,12 +270,9 @@ function CustomDrawerContent(props: any) {
 
             {/* Active check */}
             {isActive && (
-              <Icon
-                source="check"
-                size={18}
-                color={colors.primary}
-                style={{ marginRight: spacing.sm }}
-              />
+              <View style={{ marginRight: spacing.sm }}>
+                <Icon source="check" size={18} color={colors.primary} />
+              </View>
             )}
 
             {/* Info */}
@@ -595,7 +592,6 @@ export default function Layout() {
             <Drawer
               screenOptions={{
                 headerShown: false,
-                detachInactiveScreens: true,
                 drawerStyle: {
                   backgroundColor: theme.colors.surface,
                 },

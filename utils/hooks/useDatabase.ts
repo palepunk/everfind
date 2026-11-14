@@ -511,7 +511,7 @@ const initializeDefaultHouse = async () => {
       if (houses.length === 0) {
         // Create default house
         await database.write(async () => {
-          const house = await database.collections.get<House>('houses').create((h) => {
+          const house = await database.collections.get<House>('houses').create((h: any) => {
             h.name = 'My Home';
             h.ownerId = null;
             h.address = null;

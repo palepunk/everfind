@@ -408,7 +408,7 @@ export default function SettingsScreen() {
                 <Button
                   mode="outlined"
                   style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}
-                  onPress={openSignIn}
+                  onPress={() => openSignIn()}
                 >
                   Sign in
                 </Button>
