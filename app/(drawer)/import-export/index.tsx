@@ -17,7 +17,13 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import type { AppTheme } from '../../../utils/theme/theme';
-import { SheetButton, SheetHeader, SheetTheme, useSheetChrome } from '../../../components/sheets/SheetKit';
+import {
+  SheetButton,
+  SheetHeader,
+  SheetTheme,
+  useSheetBackHandler,
+  useSheetChrome,
+} from '../../../components/sheets/SheetKit';
 import { useThemePreference } from '../../../utils/theme/themePreference';
 import { triggerGlobalRefresh, useActiveHouse } from '../../../utils/hooks/useDatabase';
 import {
@@ -66,6 +72,7 @@ export default function ImportExportScreen() {
   const { user } = useAuth();
   const { activeHouseId, setActiveHouseById } = useActiveHouse();
   const exportHouseSheetRef = useRef<BottomSheetModal>(null);
+  const handleExportSheetChange = useSheetBackHandler(exportHouseSheetRef);
   const [importing, setImporting] = useState(false);
   const [exportingKind, setExportingKind] = useState<'csv' | 'pdf' | null>(null);
   const [lastImportSummary, setLastImportSummary] = useState<string | null>(null);
@@ -1022,6 +1029,7 @@ export default function ImportExportScreen() {
 
       <BottomSheetModal
         ref={exportHouseSheetRef}
+        onChange={handleExportSheetChange}
         snapPoints={exportSheetSnapPoints}
         enableDynamicSizing={false}
         enablePanDownToClose

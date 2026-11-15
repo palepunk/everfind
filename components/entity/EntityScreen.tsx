@@ -17,6 +17,7 @@ import {
   SheetNotice,
   SheetRow,
   SheetTheme,
+  useSheetBackHandler,
   useSheetChrome,
 } from '@/components/sheets/SheetKit';
 
@@ -242,6 +243,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
   const inviteSheetRef = useRef<BottomSheetModal>(null);
   const manageMemberSheetRef = useRef<BottomSheetModal>(null);
   const diagnosticsSheetRef = useRef<BottomSheetModal>(null);
+  const handleDiagnosticsSheetChange = useSheetBackHandler(diagnosticsSheetRef);
   const createSheetRef = useRef<BottomSheetModal>(null);
   const [inviteSheetIndex, setInviteSheetIndex] = useState(-1);
   const [manageMemberSheetIndex, setManageMemberSheetIndex] = useState(-1);
@@ -3398,6 +3400,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
 
       <BottomSheetModal
         ref={diagnosticsSheetRef}
+        onChange={handleDiagnosticsSheetChange}
         snapPoints={['70%']}
         enableDynamicSizing={false}
         enablePanDownToClose
@@ -3738,7 +3741,11 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         visible={deleteDialogVisible}
         testID={`entity-delete-${config.type}-dialog`}
         title={`Delete ${config.title}`}
-        message={`Are you sure you want to delete this ${config.title.toLowerCase()} and all of its content? This cannot be undone.`}
+        message={
+          config.type === 'item'
+            ? 'Are you sure you want to delete this item? This cannot be undone.'
+            : `Are you sure you want to delete this ${config.title.toLowerCase()} and everything in it? This cannot be undone.`
+        }
         confirmLabel="Delete"
         destructive
         loading={saving}

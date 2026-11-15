@@ -1,5 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  BackHandler,
+  Easing,
+  Pressable,
+  View,
+  type NativeEventSubscription,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { ActivityIndicator, Icon, IconButton, Text, ThemeProvider, useTheme } from 'react-native-paper';
 
 import type { AppTheme } from '@/utils/theme/theme';
@@ -49,6 +58,38 @@ export function useSheetChrome() {
       },
     };
   }, [colors.onSurface, colors.surface, opacity.alpha12, opacity.alpha30, surfaces.card]);
+}
+
+/**
+ * Makes the Android Back button close a bottom sheet modal instead of leaving
+ * the screen (or the app). Pass the returned handler as the sheet's onChange,
+ * or call it from an existing onChange. The listener is only registered while
+ * the sheet is open, so it takes priority over screen-level Back handlers.
+ */
+export function useSheetBackHandler(sheetRef: React.RefObject<{ dismiss: () => void } | null>) {
+  const subscriptionRef = useRef<NativeEventSubscription | null>(null);
+
+  const release = useCallback(() => {
+    subscriptionRef.current?.remove();
+    subscriptionRef.current = null;
+  }, []);
+
+  useEffect(() => release, [release]);
+
+  return useCallback(
+    (index: number) => {
+      if (index < 0) {
+        release();
+        return;
+      }
+      if (subscriptionRef.current) return;
+      subscriptionRef.current = BackHandler.addEventListener('hardwareBackPress', () => {
+        sheetRef.current?.dismiss();
+        return true;
+      });
+    },
+    [release, sheetRef]
+  );
 }
 
 type SheetHeaderProps = {
