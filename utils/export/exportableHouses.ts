@@ -1,6 +1,4 @@
-import { database } from '../storage/database';
 import { getHouseCollaboration } from '../collaboration/houseSharing';
-import { loadPowerSyncReadModeEnabled } from '../powersync/readMode';
 import { getPowerSyncRepositoryHouses } from '../powersync/repository';
 
 export type ExportableHouseOption = {
@@ -16,19 +14,16 @@ const compareByName = (left: ExportableHouseOption, right: ExportableHouseOption
 };
 
 export const getExportableHouses = async (userId?: string | null): Promise<ExportableHouseOption[]> => {
-  const powerSyncReadModeEnabled = await loadPowerSyncReadModeEnabled();
-  const houses = powerSyncReadModeEnabled
-    ? (await getPowerSyncRepositoryHouses()).map((house) => ({
-        id: house.id,
-        name: house.name,
-        ownerId: house.owner_id,
-        source: house.source,
-      }))
-    : await database.collections.get<any>('houses').query().fetch();
+  const houses = (await getPowerSyncRepositoryHouses()).map((house) => ({
+    id: house.id,
+    name: house.name,
+    ownerId: house.owner_id,
+    source: house.source,
+  }));
 
   const exportable = await Promise.all(
     houses.map(async (house: any): Promise<ExportableHouseOption | null> => {
-      if (powerSyncReadModeEnabled && house.source === 'local') {
+      if (house.source === 'local') {
         return {
           id: house.id,
           name: house.name ?? 'Untitled house',

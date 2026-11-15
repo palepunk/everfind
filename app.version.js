@@ -1,7 +1,7 @@
 module.exports = {
-  version: '1.5.1',
+  version: '1.6.0',
   androidVersionCode: {
-    production: 51,
+    production: 60,
     test: 1001,
     development: 2001,
   },

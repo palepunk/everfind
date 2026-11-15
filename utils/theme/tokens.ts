@@ -162,8 +162,12 @@ export const opacityTokens = {
   alpha60: '99',
   alpha53: '88',
   alpha40: '66',
+  alpha30: '4D',
+  alpha24: '3D',
   alpha20: '33',
+  alpha16: '29',
   alpha12: '1F',
+  alpha08: '14',
 } as const
 
 export const layoutTokens = {

@@ -41,7 +41,7 @@ type EntityFormProps<T> = {
   parentTypes: EntityType[];
   parentType: EntityType | '';
   onParentTypeChange: (type: EntityType | '') => void;
-  parentOptions: Record<EntityType, { id: string; name: string; location?: string }[]>;
+  parentOptions: Partial<Record<EntityType, { id: string; name: string; location?: string }[]>>;
   parentId: string;
   onParentIdChange: (id: string) => void;
   imagePath: string | null;

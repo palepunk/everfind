@@ -3,11 +3,12 @@ import { View } from 'react-native';
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import { IconButton, PaperProvider, Surface, Text, useTheme } from 'react-native-paper';
 
+import { useSheetChrome } from '@/components/sheets/SheetKit';
 import type { AppTheme } from '@/utils/theme/theme';
 import { EntityForm } from './EntityForm';
 import type { EntityConfig, EntityType } from './entity.types';
 
-type ParentOptions = Record<EntityType, { id: string; name: string; location?: string }[]>;
+type ParentOptions = Partial<Record<EntityType, { id: string; name: string; location?: string }[]>>;
 
 type ContextualCreateSheetProps = {
   sheetRef: React.RefObject<BottomSheetModal | null>;
@@ -78,7 +79,8 @@ export const ContextualCreateSheet = React.memo(function ContextualCreateSheet(
 
   const theme = useTheme<AppTheme>();
   const { colors, custom } = theme;
-  const { spacing, opacity } = custom;
+  const { spacing } = custom;
+  const sheetChrome = useSheetChrome();
 
   return (
     <BottomSheetModal
@@ -94,17 +96,7 @@ export const ContextualCreateSheet = React.memo(function ContextualCreateSheet(
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
       android_keyboardInputMode="adjustResize"
-      handleStyle={{ paddingTop: spacing.xs }}
-      handleIndicatorStyle={{
-        backgroundColor: `${colors.onSurface}${opacity.alpha30}`,
-        width: 36,
-        height: 5,
-      }}
-      backgroundStyle={{
-        backgroundColor: colors.surface,
-        borderTopLeftRadius: 22,
-        borderTopRightRadius: 22,
-      }}
+      {...sheetChrome.modalProps}
     >
       <PaperProvider theme={theme}>
         <View style={{ flex: 1, backgroundColor: colors.surface }}>

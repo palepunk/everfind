@@ -30,6 +30,7 @@ import { getUserAvatarUrl, useAuth } from '../../utils/auth/AuthContext';
 import { SignInSheetProvider, useSignInSheet } from '@/utils/auth/SignInSheetContext';
 import { syncSettingsIfNeeded } from '../../utils/sync/settingsSync';
 import { subscribeToSettingsUpdates } from '../../utils/sync/settingsSyncEvents';
+import { subscribeToSyncNotices } from '../../utils/sync/syncNoticeEvents';
 import { useInboxPending } from '@/src/inbox';
 import {
   bootstrapRemoteInventoryForUser,
@@ -39,6 +40,8 @@ import { setActiveHouseSwitchInProgress } from '@/utils/navigation/activeHouseSw
 import { editionCapabilities } from '@/utils/edition/config';
 
 const THEME_PREFERENCE_KEY = 'themePreference';
+const DEFAULT_SNACKBAR_DURATION_MS = 2000;
+const SYNC_NOTICE_SNACKBAR_DURATION_MS = 6000;
 
 /* ----------------------------- Drawer Content ----------------------------- */
 
@@ -95,7 +98,7 @@ function CustomDrawerContent(props: any) {
   };
 
   const handleNavigate = (path: string) => {
-    router.push(path);
+    router.push(path as any);
     props.navigation.closeDrawer();
   };
 
@@ -267,12 +270,9 @@ function CustomDrawerContent(props: any) {
 
             {/* Active check */}
             {isActive && (
-              <Icon
-                source="check"
-                size={18}
-                color={colors.primary}
-                style={{ marginRight: spacing.sm }}
-              />
+              <View style={{ marginRight: spacing.sm }}>
+                <Icon source="check" size={18} color={colors.primary} />
+              </View>
             )}
 
             {/* Info */}
@@ -546,7 +546,18 @@ export default function Layout() {
 
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarDuration, setSnackbarDuration] = useState(DEFAULT_SNACKBAR_DURATION_MS);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(
+    () =>
+      subscribeToSyncNotices((message) => {
+        setSnackbarDuration(SYNC_NOTICE_SNACKBAR_DURATION_MS);
+        setSnackbarMessage(message);
+        setSnackbarVisible(true);
+      }),
+    []
+  );
   const [inventoryBootstrapRefreshing, setInventoryBootstrapRefreshing] = useState(false);
 
   const handleSetThemePreference = useCallback(async (preference: ThemePreference) => {
@@ -581,7 +592,6 @@ export default function Layout() {
             <Drawer
               screenOptions={{
                 headerShown: false,
-                detachInactiveScreens: true,
                 drawerStyle: {
                   backgroundColor: theme.colors.surface,
                 },
@@ -615,8 +625,11 @@ export default function Layout() {
 
             <Snackbar
               visible={snackbarVisible}
-              onDismiss={() => setSnackbarVisible(false)}
-              duration={2000}
+              onDismiss={() => {
+                setSnackbarVisible(false);
+                setSnackbarDuration(DEFAULT_SNACKBAR_DURATION_MS);
+              }}
+              duration={snackbarDuration}
             >
               {snackbarMessage}
             </Snackbar>

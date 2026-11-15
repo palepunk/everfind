@@ -4,11 +4,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
-import { Appbar, Button, Icon, IconButton, Snackbar, Surface, Switch, Text, TextInput, useTheme } from 'react-native-paper';
+import { Appbar, Button, Icon, Snackbar, Surface, Switch, Text, TextInput, useTheme } from 'react-native-paper';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { FullWindowOverlay } from 'react-native-screens';
 import { Q } from '@/utils/storage/query';
+import type { TableName } from '@/utils/storage/database';
+import {
+  SheetButton,
+  SheetCard,
+  SheetHeader,
+  SheetNotice,
+  SheetRow,
+  SheetTheme,
+  useSheetBackHandler,
+  useSheetChrome,
+} from '@/components/sheets/SheetKit';
 
 import FullScreenImageViewer from '@/app/components/FullScreenImageViewer';
 import { deleteImage, isPlatformSupported, pickImage, takePhoto } from '@/utils/imageUtils';
@@ -83,7 +94,6 @@ import {
   updateHouseMember,
 } from '@/utils/collaboration/houseSharing';
 import { getHouseSyncState } from '@/utils/sync/houseSyncState';
-import { usePowerSyncReadModeEnabled } from '@/utils/powersync/readMode';
 import { editionCapabilities } from '@/utils/edition/config';
 import {
   createPowerSyncLocalHouse,
@@ -157,6 +167,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
   const { colors, custom } = theme;
   const { spacing, typography, shapes, elevation, surfaces, opacity } = custom;
   const insets = useSafeAreaInsets();
+  const sheetChrome = useSheetChrome();
   const isIos = Platform.OS === 'ios';
   const isFocused = useIsFocused();
   const { user } = useAuth();
@@ -174,7 +185,6 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
   const globalRefreshKey = useGlobalRefresh();
   const { houses } = useHouses(globalRefreshKey);
   const { currency } = useCurrencyPreference();
-  const powerSyncReadModeEnabled = usePowerSyncReadModeEnabled();
 
   const isAddMode = id === 'add';
   const isEditMode = params.mode === 'edit';
@@ -233,6 +243,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
   const inviteSheetRef = useRef<BottomSheetModal>(null);
   const manageMemberSheetRef = useRef<BottomSheetModal>(null);
   const diagnosticsSheetRef = useRef<BottomSheetModal>(null);
+  const handleDiagnosticsSheetChange = useSheetBackHandler(diagnosticsSheetRef);
   const createSheetRef = useRef<BottomSheetModal>(null);
   const [inviteSheetIndex, setInviteSheetIndex] = useState(-1);
   const [manageMemberSheetIndex, setManageMemberSheetIndex] = useState(-1);
@@ -339,7 +350,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
   }, [config.type, user?.id]);
 
   const loadPowerSyncEntity = useCallback(async () => {
-    if (!entityId || !powerSyncReadModeEnabled) return null;
+    if (!entityId) return null;
     if (config.type === 'house') {
       const house = await getPowerSyncRepositoryHouseById(undefined, entityId);
       if (!house) return null;
@@ -373,11 +384,10 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
       return item;
     }
     return null;
-  }, [config.type, entityId, powerSyncReadModeEnabled]);
+  }, [config.type, entityId]);
 
   const loadPowerSyncEntityByType = useCallback(
     async (type: EntityType, targetId: string) => {
-      if (!powerSyncReadModeEnabled) return null;
       if (type === 'room') {
         return (await getPowerSyncRepositoryRooms()).find((candidate) => candidate.id === targetId) ?? null;
       }
@@ -389,7 +399,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
       }
       return null;
     },
-    [powerSyncReadModeEnabled]
+    []
   );
 
   const refreshEntity = useCallback(async () => {
@@ -397,13 +407,13 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     try {
       const powerSyncEntity = await loadPowerSyncEntity();
       if (powerSyncEntity) {
-        setEntity(powerSyncEntity as LoadedEntity<T>);
+        setEntity(powerSyncEntity as unknown as LoadedEntity<T>);
         setSelectedHouseId((powerSyncEntity as any).houseId || '');
         setEntityRevision((prev) => prev + 1);
         return;
       }
 
-      const record = await database.collections.get<any>(config.collection).find(entityId);
+      const record = await database.collections.get<any>(config.collection as TableName).find(entityId);
       setEntity(record);
       setSelectedHouseId((record as any).houseId || '');
       setEntityRevision((prev) => prev + 1);
@@ -418,7 +428,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     try {
       let localRecord: any = null;
       try {
-        localRecord = await database.collections.get<any>(config.collection).find(entityId);
+        localRecord = await database.collections.get<any>(config.collection as TableName).find(entityId);
       } catch {
         localRecord = null;
       }
@@ -439,7 +449,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
                 remotePath: record.remotePath ?? null,
                 position: record.position ?? null,
               }))
-              .sort((left, right) => {
+              .sort((left: any, right: any) => {
                 const leftPosition = typeof left.position === 'number' ? left.position : 0;
                 const rightPosition = typeof right.position === 'number' ? right.position : 0;
                 if (leftPosition !== rightPosition) {
@@ -970,13 +980,13 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
   );
 
   const childSections = useMemo(() => {
-    if (!entityId) return [] as { type: EntityType; items: ChildSectionItem[] }[];
+    if (!entityId) return [] as { type: EntityType; label: string; icon: string; items: ChildSectionItem[] }[];
 
     return (config.children || []).map((child) => ({
       type: child.type,
       label: child.label,
       icon: child.icon,
-      items: childItemsByType[child.type] || [],
+      items: childItemsByType[child.type as keyof typeof childItemsByType] || [],
     }));
   }, [childItemsByType, config.children, entityId]);
 
@@ -1104,7 +1114,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     const load = async () => {
       try {
         if (!isAddMode && entityId) {
-          const record = (await loadPowerSyncEntity()) ?? await database.collections.get<any>(config.collection).find(entityId);
+          const record = (await loadPowerSyncEntity()) ?? await database.collections.get<any>(config.collection as TableName).find(entityId);
           setEntity(record);
 
           if (isEditMode) {
@@ -1159,7 +1169,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
               nextHouseId = '';
             }
           }
-          if (!nextHouseId && powerSyncReadModeEnabled && paramParentType && paramParentId && paramParentType !== 'house') {
+          if (!nextHouseId && paramParentType && paramParentId && paramParentType !== 'house') {
             const parentRecord = await loadPowerSyncEntityByType(paramParentType, paramParentId);
             nextHouseId = (parentRecord as any)?.houseId || '';
           }
@@ -1210,7 +1220,6 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     isAddMode,
     isEditMode,
     activeHouseId,
-    powerSyncReadModeEnabled,
     params.parentId,
     params.parentType,
     params.houseId,
@@ -1258,7 +1267,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
             nextHouseId = '';
           }
         }
-        if (!nextHouseId && powerSyncReadModeEnabled && paramParentType && paramParentId && paramParentType !== 'house') {
+        if (!nextHouseId && paramParentType && paramParentId && paramParentType !== 'house') {
           const parentRecord = await loadPowerSyncEntityByType(paramParentType, paramParentId);
           nextHouseId = (parentRecord as any)?.houseId || '';
         }
@@ -1285,7 +1294,6 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
       params.parentType,
       params.roomId,
       parentTypes,
-      powerSyncReadModeEnabled,
       shouldReturnToInbox,
     ])
   );
@@ -1542,7 +1550,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         notes: (entity as any).notes ?? null,
         syncImageStorage: false,
       });
-      setEntity(updated as LoadedEntity<T>);
+      setEntity(updated as unknown as LoadedEntity<T>);
       return updated;
     },
     [config.type, entity, entityId]
@@ -1550,24 +1558,11 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
 
   const updateItemImagePositions = useCallback(
     async (images: Array<{ id: string; position: number }>) => {
-      if (powerSyncReadModeEnabled) {
-        for (const image of images) {
-          await updateItemImage(image.id, { position: image.position }, { imageChanged: false });
-        }
-        return;
+      for (const image of images) {
+        await updateItemImage(image.id, { position: image.position }, { imageChanged: false });
       }
-
-      await database.write(async () => {
-        for (const image of images) {
-          const record = await database.collections.get<any>('item_images').find(image.id);
-          await record.update((current: any) => {
-            current.position = image.position;
-          });
-        }
-      });
-
     },
-    [powerSyncReadModeEnabled, updateItemImage]
+    [updateItemImage]
   );
 
   const handleItemDetailAddImage = useCallback(
@@ -1604,74 +1599,34 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         setOptimisticItemImages((current) => [...current, optimisticImage]);
         setSelectedItemImageId(optimisticId);
 
-        if (powerSyncReadModeEnabled) {
-          const itemImage = await addItemImage(entityId, (entity as any).houseId, result.uri, nextPosition, optimisticId);
-          if (nextPosition === 0) {
-            await syncPowerSyncItemCoverImage(result.uri);
-          }
-          setHiddenItemImageIds((current) => {
-            if (!current.has(itemImage.id)) return current;
-            const next = new Set(current);
-            next.delete(itemImage.id);
-            return next;
-          });
-          setOptimisticItemImages((current) =>
-            current.map((image) =>
-              image.id === optimisticId
-                ? {
-                    ...image,
-                    id: itemImage.id,
-                    itemId: (itemImage as any).itemId ?? entityId,
-                    houseId: (itemImage as any).houseId ?? (entity as any).houseId,
-                    imagePath: (itemImage as any).imagePath ?? result.uri,
-                    remotePath: (itemImage as any).remotePath ?? null,
-                    position: (itemImage as any).position ?? nextPosition,
-                  }
-                : image
-            )
-          );
-          setSelectedItemImageId(itemImage.id);
-          trackRecordImageAdded(config.type, { source: 'detail' });
-          triggerGlobalRefresh();
-          return;
+        const itemImage = await addItemImage(entityId, (entity as any).houseId, result.uri, nextPosition, optimisticId);
+        if (nextPosition === 0) {
+          await syncPowerSyncItemCoverImage(result.uri);
         }
-
-        let createdImageId: string | null = null;
-        await database.write(async () => {
-          const created = await database.collections.get<any>('item_images').create((image: any) => {
-            image._raw.id = optimisticId;
-            image.itemId = entityId;
-            image.houseId = (entity as any).houseId;
-            image.imagePath = result.uri;
-            image.remotePath = null;
-            image.position = nextPosition;
-          });
-          createdImageId = created.id;
+        setHiddenItemImageIds((current) => {
+          if (!current.has(itemImage.id)) return current;
+          const next = new Set(current);
+          next.delete(itemImage.id);
+          return next;
         });
-
-        if (createdImageId) {
-          await syncItemCoverImage(entityId);
-          const freshItem = await database.collections.get<any>('items').find(entityId);
-          setEntity(freshItem);
-          setHiddenItemImageIds((current) => {
-            if (!current.has(createdImageId as string)) return current;
-            const next = new Set(current);
-            next.delete(createdImageId as string);
-            return next;
-          });
-          setOptimisticItemImages((current) =>
-            current.map((image) =>
-              image.id === optimisticId
-                ? {
-                    ...image,
-                    id: createdImageId as string,
-                  }
-                : image
-            )
-          );
-          setSelectedItemImageId(createdImageId);
-          trackRecordImageAdded(config.type, { source: 'detail' });
-        }
+        setOptimisticItemImages((current) =>
+          current.map((image) =>
+            image.id === optimisticId
+              ? {
+                  ...image,
+                  id: itemImage.id,
+                  itemId: (itemImage as any).itemId ?? entityId,
+                  houseId: (itemImage as any).houseId ?? (entity as any).houseId,
+                  imagePath: (itemImage as any).imagePath ?? result.uri,
+                  remotePath: (itemImage as any).remotePath ?? null,
+                  position: (itemImage as any).position ?? nextPosition,
+                }
+              : image
+          )
+        );
+        setSelectedItemImageId(itemImage.id);
+        trackRecordImageAdded(config.type, { source: 'detail' });
+        triggerGlobalRefresh();
       } catch (error: any) {
         if (pendingOptimisticId) {
           setOptimisticItemImages((current) => current.filter((image) => image.id !== pendingOptimisticId));
@@ -1694,7 +1649,6 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
       entity,
       entityId,
       itemPictureLimit,
-      powerSyncReadModeEnabled,
       prepareForImagePicker,
       sortedItemImages,
       syncPowerSyncItemCoverImage,
@@ -1715,25 +1669,11 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
       setEntity((current) => (current ? { ...current, imagePath: null } : current));
     }
     try {
-      if (powerSyncReadModeEnabled) {
-        await deleteItemImage(selectedItemImage.id);
-      } else {
-        await database.write(async () => {
-          const record = await database.collections.get<any>('item_images').find(selectedItemImage.id);
-          await record.destroyPermanently();
-        });
-
-      }
+      await deleteItemImage(selectedItemImage.id);
 
       const remaining = remainingVisibleImages.map((image, index) => ({ id: image.id, position: index }));
       await updateItemImagePositions(remaining);
-      if (powerSyncReadModeEnabled) {
-        await syncPowerSyncItemCoverImage(nextCoverImage?.imagePath ?? null);
-      } else {
-        await syncItemCoverImage(entityId);
-        const freshItem = await database.collections.get<any>('items').find(entityId);
-        setEntity(freshItem);
-      }
+      await syncPowerSyncItemCoverImage(nextCoverImage?.imagePath ?? null);
     } catch (error) {
       setHiddenItemImageIds((current) => {
         const next = new Set(current);
@@ -1748,7 +1688,6 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     config.type,
     deleteItemImage,
     entityId,
-    powerSyncReadModeEnabled,
     selectedItemImage,
     sortedItemImages,
     syncPowerSyncItemCoverImage,
@@ -1794,29 +1733,14 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         });
         setSelectedItemImageId(selectedItemImage.id);
 
-        if (powerSyncReadModeEnabled) {
-          await updateItemImage(
-            selectedItemImage.id,
-            { imagePath: result.uri, remotePath: null },
-            { imageChanged: true }
-          );
-        } else {
-          await database.write(async () => {
-            const record = await database.collections.get<any>('item_images').find(selectedItemImage.id);
-            await record.update((current: any) => {
-              current.imagePath = result.uri;
-              current.remotePath = null;
-            });
-          });
-
-        }
+        await updateItemImage(
+          selectedItemImage.id,
+          { imagePath: result.uri, remotePath: null },
+          { imageChanged: true }
+        );
         if (entityId) {
-          if (powerSyncReadModeEnabled && selectedItemImage.position === 0) {
+          if (selectedItemImage.position === 0) {
             await syncPowerSyncItemCoverImage(result.uri);
-          } else if (!powerSyncReadModeEnabled) {
-            await syncItemCoverImage(entityId);
-            const freshItem = await database.collections.get<any>('items').find(entityId);
-            setEntity(freshItem);
           }
         }
         trackRecordImageAdded(config.type, { source: 'detail' });
@@ -1828,7 +1752,6 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
       config.type,
       entityId,
       handleItemDetailAddImage,
-      powerSyncReadModeEnabled,
       prepareForImagePicker,
       selectedItemImage,
       syncPowerSyncItemCoverImage,
@@ -1983,7 +1906,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         await contextualCreateConfig.limits.check();
       }
 
-      if (powerSyncReadModeEnabled && ['room', 'container', 'box', 'item'].includes(contextualCreateType)) {
+      if (['room', 'container', 'box', 'item'].includes(contextualCreateType)) {
         if (contextualCreateType === 'item' && contextualCreateItemImages.length) {
           await assertCanSetItemPictureCount(contextualCreateItemImages.length);
         }
@@ -2035,12 +1958,12 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         trackRecordCreated(contextualCreateType, { source: 'form' });
         closeContextualCreateSheet();
         triggerGlobalRefresh();
-        router.push(`/${toRouteSegment(contextualCreateType)}/${created.id}`);
+        router.push(`/${toRouteSegment(contextualCreateType)}/${created.id}` as any);
         return;
       }
 
       const created = await database.write(async () =>
-        database.collections.get<any>(contextualCreateConfig.collection).create((record: any) => {
+        database.collections.get<any>(contextualCreateConfig.collection as TableName).create((record: any) => {
           contextualCreateConfig.fields.forEach((field) => {
             const value = contextualCreateValues[String(field.key)]?.trim() || '';
             if (field.key === 'purchasePrice') {
@@ -2095,7 +2018,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
 
       trackRecordCreated(contextualCreateType, { source: 'form' });
       closeContextualCreateSheet();
-      router.push(`/${toRouteSegment(contextualCreateType)}/${created.id}`);
+      router.push(`/${toRouteSegment(contextualCreateType)}/${created.id}` as any);
     } catch (e: any) {
       const errorCode = e?.message;
       if (
@@ -2150,259 +2073,131 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     setSaving(true);
     try {
       if (isEditMode && entityId) {
-        if (powerSyncReadModeEnabled && ['house', 'room', 'container', 'box', 'item'].includes(config.type)) {
-          let updatedRecord: any;
-          if (config.type === 'house') {
-            updatedRecord = await updatePowerSyncLocalHouse({
-              houseId: entityId,
-              name: fieldValues.name.trim(),
-              ownerId: user?.id,
-              address: fieldValues.address?.trim() || null,
-              notes: fieldValues.notes?.trim() || null,
-              imagePath,
-            });
-          } else if (config.type === 'room') {
-            updatedRecord = await updatePowerSyncLocalRoom({
-              roomId: entityId,
-              houseId: selectedHouseId || undefined,
-              name: fieldValues.name.trim(),
-              description: fieldValues.description?.trim() || null,
-              imagePath,
-            });
-          } else if (config.type === 'container') {
-            updatedRecord = await updatePowerSyncLocalContainer({
-              containerId: entityId,
-              houseId: selectedHouseId || undefined,
-              roomId: parentId || (entity as any)?.roomId || undefined,
-              name: fieldValues.name.trim(),
-              description: fieldValues.description?.trim() || null,
-              imagePath,
-            });
-          } else if (config.type === 'box') {
-            updatedRecord = await updatePowerSyncLocalBox({
-              boxId: entityId,
-              houseId: selectedHouseId || undefined,
-              parentType: parentType || (entity as any)?.parentType || undefined,
-              parentId: parentId || (entity as any)?.parentId || undefined,
-              name: fieldValues.name.trim(),
-              description: fieldValues.description?.trim() || null,
-              imagePath,
-            });
-          } else {
-            updatedRecord = await updatePowerSyncLocalItem({
-              itemId: entityId,
-              houseId: selectedHouseId || undefined,
-              parentType: parentType || (entity as any)?.parentType || undefined,
-              parentId: parentId || (entity as any)?.parentId || undefined,
-              name: fieldValues.name.trim(),
-              description: fieldValues.description?.trim() || null,
-              imagePath: (entity as any)?.imagePath ?? null,
-              tags: fieldValues.tags ?? '',
-              purchasePriceCents: parseCurrencyToCents(fieldValues.purchasePrice ?? ''),
-              notes: fieldValues.notes?.trim() || null,
-            });
-          }
-          setEntity(updatedRecord);
-          setEntityRevision((prev) => prev + 1);
-          triggerGlobalRefresh();
-          router.back();
-          return;
-        }
-
-        let updatedRecord: any | null = null;
-        await database.write(async () => {
-          const record = await database.collections.get<any>(config.collection).find(entityId);
-          await record.update((current: any) => {
-            config.fields.forEach((field) => {
-              const value = fieldValues[String(field.key)].trim();
-              if (field.key === 'purchasePrice') {
-                current.purchasePriceCents = parseCurrencyToCents(value);
-                return;
-              }
-              current[field.key] = value;
-            });
-            if (config.type === 'container') {
-              current.roomId = parentId;
-            } else if (config.type === 'box' || config.type === 'item') {
-              current.parentType = parentType || null;
-              current.parentId = parentId || null;
-            }
-            if (config.type === 'house' && user?.id) {
-              current.ownerId = user.id;
-            }
-            if (config.type !== 'house') {
-              current.houseId = selectedHouseId;
-            }
-            if (config.type !== 'item') {
-              current.imagePath = imagePath || null;
-            }
+        let updatedRecord: any;
+        if (config.type === 'house') {
+          updatedRecord = await updatePowerSyncLocalHouse({
+            houseId: entityId,
+            name: fieldValues.name.trim(),
+            ownerId: user?.id,
+            address: fieldValues.address?.trim() || null,
+            notes: fieldValues.notes?.trim() || null,
+            imagePath,
           });
-          updatedRecord = record;
-        });
-        if (updatedRecord) {
-          if (config.type === 'item') {
-            await syncItemCoverImage(updatedRecord.id);
-            const freshItem = await database.collections.get<any>('items').find(updatedRecord.id);
-            updatedRecord = freshItem;
-          }
+        } else if (config.type === 'room') {
+          updatedRecord = await updatePowerSyncLocalRoom({
+            roomId: entityId,
+            houseId: selectedHouseId || undefined,
+            name: fieldValues.name.trim(),
+            description: fieldValues.description?.trim() || null,
+            imagePath,
+          });
+        } else if (config.type === 'container') {
+          updatedRecord = await updatePowerSyncLocalContainer({
+            containerId: entityId,
+            houseId: selectedHouseId || undefined,
+            roomId: parentId || (entity as any)?.roomId || undefined,
+            name: fieldValues.name.trim(),
+            description: fieldValues.description?.trim() || null,
+            imagePath,
+          });
+        } else if (config.type === 'box') {
+          updatedRecord = await updatePowerSyncLocalBox({
+            boxId: entityId,
+            houseId: selectedHouseId || undefined,
+            parentType: parentType || (entity as any)?.parentType || undefined,
+            parentId: parentId || (entity as any)?.parentId || undefined,
+            name: fieldValues.name.trim(),
+            description: fieldValues.description?.trim() || null,
+            imagePath,
+          });
+        } else {
+          updatedRecord = await updatePowerSyncLocalItem({
+            itemId: entityId,
+            houseId: selectedHouseId || undefined,
+            parentType: parentType || (entity as any)?.parentType || undefined,
+            parentId: parentId || (entity as any)?.parentId || undefined,
+            name: fieldValues.name.trim(),
+            description: fieldValues.description?.trim() || null,
+            imagePath: (entity as any)?.imagePath ?? null,
+            tags: fieldValues.tags ?? '',
+            purchasePriceCents: parseCurrencyToCents(fieldValues.purchasePrice ?? ''),
+            notes: fieldValues.notes?.trim() || null,
+          });
         }
+        setEntity(updatedRecord);
         setEntityRevision((prev) => prev + 1);
+        triggerGlobalRefresh();
         router.back();
       } else {
         if (config.limits?.check) {
           await config.limits.check();
         }
-        if (powerSyncReadModeEnabled && ['house', 'room', 'container', 'box', 'item'].includes(config.type)) {
-          const created =
-            config.type === 'house'
-              ? await createPowerSyncLocalHouse({
+        const created =
+          config.type === 'house'
+            ? await createPowerSyncLocalHouse({
+                name: fieldValues.name.trim(),
+                ownerId: user?.id ?? null,
+                address: fieldValues.address?.trim() || null,
+                notes: fieldValues.notes?.trim() || null,
+                imagePath: imagePath || null,
+              })
+            : config.type === 'room'
+              ? await createPowerSyncLocalRoom({
+                  houseId: selectedHouseId,
                   name: fieldValues.name.trim(),
-                  ownerId: user?.id ?? null,
-                  address: fieldValues.address?.trim() || null,
-                  notes: fieldValues.notes?.trim() || null,
+                  description: fieldValues.description?.trim() || null,
                   imagePath: imagePath || null,
                 })
-              : config.type === 'room'
-                ? await createPowerSyncLocalRoom({
+              : config.type === 'container'
+                ? await createPowerSyncLocalContainer({
                     houseId: selectedHouseId,
+                    roomId: parentId,
                     name: fieldValues.name.trim(),
                     description: fieldValues.description?.trim() || null,
                     imagePath: imagePath || null,
                   })
-                : config.type === 'container'
-                  ? await createPowerSyncLocalContainer({
+                : config.type === 'box'
+                  ? await createPowerSyncLocalBox({
                       houseId: selectedHouseId,
-                      roomId: parentId,
+                      parentType: parentType || null,
+                      parentId: parentId || null,
                       name: fieldValues.name.trim(),
                       description: fieldValues.description?.trim() || null,
                       imagePath: imagePath || null,
                     })
-                  : config.type === 'box'
-                    ? await createPowerSyncLocalBox({
-                        houseId: selectedHouseId,
-                        parentType: parentType || null,
-                        parentId: parentId || null,
-                        name: fieldValues.name.trim(),
-                        description: fieldValues.description?.trim() || null,
-                        imagePath: imagePath || null,
-                      })
-                    : await createPowerSyncLocalItem({
-                        houseId: selectedHouseId,
-                        parentType: parentType || null,
-                        parentId: parentId || null,
-                        name: fieldValues.name.trim(),
-                        description: fieldValues.description?.trim() || null,
-                        imagePath: createModeItemImages[0] ?? null,
-                        tags: fieldValues.tags ?? '',
-                        purchasePriceCents: parseCurrencyToCents(fieldValues.purchasePrice ?? ''),
-                        notes: fieldValues.notes?.trim() || null,
-                        syncImageStorage: createModeItemImages.length === 0,
-                      });
+                  : await createPowerSyncLocalItem({
+                      houseId: selectedHouseId,
+                      parentType: parentType || null,
+                      parentId: parentId || null,
+                      name: fieldValues.name.trim(),
+                      description: fieldValues.description?.trim() || null,
+                      imagePath: createModeItemImages[0] ?? null,
+                      tags: fieldValues.tags ?? '',
+                      purchasePriceCents: parseCurrencyToCents(fieldValues.purchasePrice ?? ''),
+                      notes: fieldValues.notes?.trim() || null,
+                      syncImageStorage: createModeItemImages.length === 0,
+                    });
 
-          if (config.type === 'item' && createModeItemImages.length) {
-            await assertCanSetItemPictureCount(createModeItemImages.length);
-            for (const [index, currentImagePath] of createModeItemImages.entries()) {
-              await addItemImage(created.id, created.houseId, currentImagePath, index);
-            }
-          }
-
-          setEntity(created as LoadedEntity<T>);
-          setSelectedHouseId((created as any).houseId || selectedHouseId);
-          if (config.type !== 'item') {
-            setImagePath((created as any).imagePath ?? imagePath ?? null);
-          }
-          setEntityRevision((prev) => prev + 1);
-          trackRecordCreated(config.type, { source: 'form' });
-          triggerGlobalRefresh();
-          router.replace({
-            pathname: `/${entityRouteSegment}/[id]`,
-            params: {
-              id: created.id,
-              ...(entry === 'direct' ? { entry: 'direct' } : {}),
-              mode: undefined,
-              parentType: undefined,
-              parentId: undefined,
-              roomId: undefined,
-              houseId: undefined,
-              prefillName: undefined,
-              prefillNotes: undefined,
-              sourceInboxEntryId: undefined,
-              deepLinkSource: undefined,
-            },
-          });
-          return;
-        }
-
-        const created = await database.write(async () =>
-          database.collections.get<any>(config.collection).create((record: any) => {
-            config.fields.forEach((field) => {
-              const value = fieldValues[String(field.key)].trim();
-              if (field.key === 'purchasePrice') {
-                record.purchasePriceCents = parseCurrencyToCents(value);
-                return;
-              }
-              record[field.key] = value;
-            });
-            if (config.type === 'container') {
-              record.roomId = parentId;
-            } else if (config.type === 'box' || config.type === 'item') {
-              record.parentType = parentType || null;
-              record.parentId = parentId || null;
-            }
-            record.imagePath =
-              config.type === 'item' && isAddMode
-                ? createModeItemImages[0] ?? null
-                : imagePath || null;
-            if (config.type === 'house' && user?.id) {
-              record.ownerId = user.id;
-            }
-            if (config.type !== 'house') {
-              record.houseId = selectedHouseId;
-            }
-          })
-        );
-        if (!created || !created.id) {
-          Alert.alert('Error', `Failed to save ${config.title.toLowerCase()}`);
-          return;
-        }
-        if (config.type === 'house') {
-          await setHouseSyncEnabled(created.id, false);
-        } else if (config.type === 'item') {
-          if (createModeItemImages.length) {
-            await assertCanSetItemPictureCount(createModeItemImages.length);
-            for (const [index, currentImagePath] of createModeItemImages.entries()) {
-              await database.write(async () => {
-                await database.collections.get<any>('item_images').create((record: any) => {
-                  if (index === 0) {
-                    record._raw.id = getLegacyItemImageId(created.id);
-                  }
-                  record.itemId = created.id;
-                  record.houseId = created.houseId;
-                  record.imagePath = currentImagePath;
-                  record.remotePath = null;
-                  record.position = index;
-                });
-              });
-            }
-            await syncItemCoverImage(created.id);
+        if (config.type === 'item' && createModeItemImages.length) {
+          await assertCanSetItemPictureCount(createModeItemImages.length);
+          for (const [index, currentImagePath] of createModeItemImages.entries()) {
+            await addItemImage(created.id, (created as any).houseId, currentImagePath, index);
           }
         }
+
+        setEntity(created as unknown as LoadedEntity<T>);
+        setSelectedHouseId((created as any).houseId || selectedHouseId);
+        if (config.type !== 'item') {
+          setImagePath((created as any).imagePath ?? imagePath ?? null);
+        }
+        setEntityRevision((prev) => prev + 1);
         trackRecordCreated(config.type, { source: 'form' });
-        if (config.type === 'item' && sourceInboxEntryId) {
-          await markApplied(sourceInboxEntryId, { itemId: created.id });
-          if (user) {
-            syncPowerSyncConnectionForSession(true).catch((error) =>
-              console.warn('Inbox apply PowerSync connect failed', error)
-            );
-          }
-        }
+        triggerGlobalRefresh();
         router.replace({
-          pathname: `/${entityRouteSegment}/[id]`,
+          pathname: `/${entityRouteSegment}/[id]` as any,
           params: {
             id: created.id,
             ...(entry === 'direct' ? { entry: 'direct' } : {}),
-            ...(shouldReturnToInbox ? { returnTo: 'inbox' } : {}),
-            // Ensure we always leave form mode after creating a record.
             mode: undefined,
             parentType: undefined,
             parentId: undefined,
@@ -2452,162 +2247,25 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     }
 
     setDeleteDialogVisible(true);
-  }, [activeHouseId, canDeleteCurrentEntity, config.title, config.type, entityId]);
+  }, [activeHouseId, canDeleteCurrentEntity, config.type, entityId]);
 
   const confirmDelete = useCallback(async () => {
     if (!entityId) return;
     setSaving(true);
     try {
-      if (powerSyncReadModeEnabled && ['house', 'room', 'container', 'box', 'item'].includes(config.type)) {
-        if (config.type === 'house') {
-          await deletePowerSyncLocalHouse({ houseId: entityId });
-        } else if (config.type === 'room') {
-          await deletePowerSyncLocalRoom({ roomId: entityId });
-        } else if (config.type === 'container') {
-          await deletePowerSyncLocalContainer({ containerId: entityId });
-        } else if (config.type === 'box') {
-          await deletePowerSyncLocalBox({ boxId: entityId });
-        } else {
-          await deletePowerSyncLocalItem({ itemId: entityId });
-        }
-        setDeleteDialogVisible(false);
-        triggerGlobalRefresh();
-        handleBack();
-        return;
+      if (config.type === 'house') {
+        await deletePowerSyncLocalHouse({ houseId: entityId });
+      } else if (config.type === 'room') {
+        await deletePowerSyncLocalRoom({ roomId: entityId });
+      } else if (config.type === 'container') {
+        await deletePowerSyncLocalContainer({ containerId: entityId });
+      } else if (config.type === 'box') {
+        await deletePowerSyncLocalBox({ boxId: entityId });
+      } else {
+        await deletePowerSyncLocalItem({ itemId: entityId });
       }
-
-      await database.write(async () => {
-        const deleteModels = async (models: any[]) => {
-          for (const model of models) {
-            await model.destroyPermanently();
-          }
-        };
-
-        if (config.type === 'house') {
-          const itemImages = await database.collections.get<any>('item_images').query(Q.where('house_id', entityId)).fetch();
-          const items = await database.collections.get<any>('items').query(Q.where('house_id', entityId)).fetch();
-          const boxes = await database.collections.get<any>('boxes').query(Q.where('house_id', entityId)).fetch();
-          const containers = await database.collections.get<any>('containers').query(Q.where('house_id', entityId)).fetch();
-          const rooms = await database.collections.get<any>('rooms').query(Q.where('house_id', entityId)).fetch();
-          const house = await database.collections.get<any>('houses').find(entityId);
-
-          await deleteModels(itemImages);
-          await deleteModels(items);
-          await deleteModels(boxes);
-          await deleteModels(containers);
-          await deleteModels(rooms);
-          await house.destroyPermanently();
-          return;
-        }
-
-        if (config.type === 'room') {
-          const containers = await database.collections.get<any>('containers').query(Q.where('room_id', entityId)).fetch();
-          const containerIds = containers.map((container) => container.id);
-          const roomBoxes = await database.collections
-            .get<any>('boxes')
-            .query(Q.where('parent_type', 'room'), Q.where('parent_id', entityId))
-            .fetch();
-          const containerBoxes =
-            containerIds.length > 0
-              ? await database.collections
-                  .get<any>('boxes')
-                  .query(Q.where('parent_type', 'container'), Q.where('parent_id', Q.oneOf(containerIds)))
-                  .fetch()
-              : [];
-          const boxIds = [...roomBoxes, ...containerBoxes].map((box) => box.id);
-          const roomItems = await database.collections
-            .get<any>('items')
-            .query(Q.where('parent_type', 'room'), Q.where('parent_id', entityId))
-            .fetch();
-          const containerItems =
-            containerIds.length > 0
-              ? await database.collections
-                  .get<any>('items')
-                  .query(Q.where('parent_type', 'container'), Q.where('parent_id', Q.oneOf(containerIds)))
-                  .fetch()
-              : [];
-          const boxItems =
-            boxIds.length > 0
-              ? await database.collections
-                  .get<any>('items')
-                  .query(Q.where('parent_type', 'box'), Q.where('parent_id', Q.oneOf(boxIds)))
-                  .fetch()
-              : [];
-          const allItemIds = [...roomItems, ...containerItems, ...boxItems].map((item) => item.id);
-          const itemImages =
-            allItemIds.length > 0
-              ? await database.collections.get<any>('item_images').query(Q.where('item_id', Q.oneOf(allItemIds))).fetch()
-              : [];
-
-          const room = await database.collections.get<any>('rooms').find(entityId);
-
-          await deleteModels(itemImages);
-          await deleteModels([...roomItems, ...containerItems, ...boxItems]);
-          await deleteModels([...roomBoxes, ...containerBoxes]);
-          await deleteModels(containers);
-          await room.destroyPermanently();
-          return;
-        }
-
-        if (config.type === 'container') {
-          const boxes = await database.collections
-            .get<any>('boxes')
-            .query(Q.where('parent_type', 'container'), Q.where('parent_id', entityId))
-            .fetch();
-          const boxIds = boxes.map((box) => box.id);
-          const containerItems = await database.collections
-            .get<any>('items')
-            .query(Q.where('parent_type', 'container'), Q.where('parent_id', entityId))
-            .fetch();
-          const boxItems =
-            boxIds.length > 0
-              ? await database.collections
-                  .get<any>('items')
-                  .query(Q.where('parent_type', 'box'), Q.where('parent_id', Q.oneOf(boxIds)))
-                  .fetch()
-              : [];
-          const allItemIds = [...containerItems, ...boxItems].map((item) => item.id);
-          const itemImages =
-            allItemIds.length > 0
-              ? await database.collections.get<any>('item_images').query(Q.where('item_id', Q.oneOf(allItemIds))).fetch()
-              : [];
-
-          const container = await database.collections.get<any>('containers').find(entityId);
-
-          await deleteModels(itemImages);
-          await deleteModels([...containerItems, ...boxItems]);
-          await deleteModels(boxes);
-          await container.destroyPermanently();
-          return;
-        }
-
-        if (config.type === 'box') {
-          const items = await database.collections
-            .get<any>('items')
-            .query(Q.where('parent_type', 'box'), Q.where('parent_id', entityId))
-            .fetch();
-          const itemIds = items.map((item) => item.id);
-          const itemImages =
-            itemIds.length > 0
-              ? await database.collections.get<any>('item_images').query(Q.where('item_id', Q.oneOf(itemIds))).fetch()
-              : [];
-          const box = await database.collections.get<any>('boxes').find(entityId);
-
-          await deleteModels(itemImages);
-          await deleteModels(items);
-          await box.destroyPermanently();
-          return;
-        }
-
-        if (config.type === 'item') {
-          const item = await database.collections.get<any>('items').find(entityId);
-          const itemImages = await database.collections.get<any>('item_images').query(Q.where('item_id', entityId)).fetch();
-          await deleteModels(itemImages);
-          await item.destroyPermanently();
-        }
-      });
-
       setDeleteDialogVisible(false);
+      triggerGlobalRefresh();
       handleBack();
     } catch (error) {
       console.warn('Failed to delete record', error);
@@ -2615,7 +2273,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     } finally {
       setSaving(false);
     }
-  }, [config.title, config.type, entityId, handleBack, powerSyncReadModeEnabled]);
+  }, [config.title, config.type, entityId, handleBack]);
 
   /* ============================= RENDER ============================= */
   const renderTitle = () => {
@@ -2630,7 +2288,9 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     if (!entityId) return [];
     if (!canWriteContent) return [];
 
-    const actions = (config.children || []).map((child) => ({
+    const actions: { key: string; label: string; icon: string; onPress: () => void }[] = (
+      config.children || []
+    ).map((child) => ({
       key: child.type,
       label: `Add ${child.label.endsWith('es') ? child.label.slice(0, -2) : child.label.endsWith('s') ? child.label.slice(0, -1) : child.label}`,
       icon: child.icon,
@@ -2669,80 +2329,67 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
   const updateEntityImagePath = useCallback(
     async (nextImagePath: string | null) => {
       if (!entityId) return;
-      if (powerSyncReadModeEnabled && ['house', 'room', 'container', 'box', 'item'].includes(config.type)) {
-        let updatedRecord: any;
-        if (config.type === 'house') {
-          updatedRecord = await updatePowerSyncLocalHouse({
-            houseId: entityId,
-            name: ((entity as any)?.name ?? '').trim(),
-            ownerId: user?.id,
-            address: (entity as any)?.address ?? null,
-            notes: (entity as any)?.notes ?? null,
-            imagePath: nextImagePath,
-          });
-        } else if (config.type === 'room') {
-          updatedRecord = await updatePowerSyncLocalRoom({
-            roomId: entityId,
-            houseId: (entity as any)?.houseId,
-            name: ((entity as any)?.name ?? '').trim(),
-            description: (entity as any)?.description ?? null,
-            imagePath: nextImagePath,
-          });
-        } else if (config.type === 'container') {
-          updatedRecord = await updatePowerSyncLocalContainer({
-            containerId: entityId,
-            houseId: (entity as any)?.houseId,
-            roomId: (entity as any)?.roomId,
-            name: ((entity as any)?.name ?? '').trim(),
-            description: (entity as any)?.description ?? null,
-            imagePath: nextImagePath,
-          });
-        } else if (config.type === 'box') {
-          updatedRecord = await updatePowerSyncLocalBox({
-            boxId: entityId,
-            houseId: (entity as any)?.houseId,
-            parentType: (entity as any)?.parentType ?? null,
-            parentId: (entity as any)?.parentId ?? null,
-            name: ((entity as any)?.name ?? '').trim(),
-            description: (entity as any)?.description ?? null,
-            imagePath: nextImagePath,
-            tags: (entity as any)?.tags ?? '',
-          });
-        } else {
-          updatedRecord = await updatePowerSyncLocalItem({
-            itemId: entityId,
-            houseId: (entity as any)?.houseId,
-            parentType: (entity as any)?.parentType ?? null,
-            parentId: (entity as any)?.parentId ?? null,
-            name: ((entity as any)?.name ?? '').trim(),
-            description: (entity as any)?.description ?? null,
-            imagePath: nextImagePath,
-            tags: (entity as any)?.tags ?? '',
-            purchasePriceCents: (entity as any)?.purchasePriceCents ?? null,
-            notes: (entity as any)?.notes ?? null,
-          });
-        }
-        setEntity({
-          ...(updatedRecord as LoadedEntity<T>),
+      let updatedRecord: any;
+      if (config.type === 'house') {
+        updatedRecord = await updatePowerSyncLocalHouse({
+          houseId: entityId,
+          name: ((entity as any)?.name ?? '').trim(),
+          ownerId: user?.id,
+          address: (entity as any)?.address ?? null,
+          notes: (entity as any)?.notes ?? null,
           imagePath: nextImagePath,
         });
-        setImagePath(nextImagePath);
-        setEntityRevision((prev) => prev + 1);
-        triggerGlobalRefresh();
-        return;
-      }
-
-      await database.write(async () => {
-        const record = await database.collections.get<any>(config.collection).find(entityId);
-        await record.update((current: any) => {
-          current.imagePath = nextImagePath;
+      } else if (config.type === 'room') {
+        updatedRecord = await updatePowerSyncLocalRoom({
+          roomId: entityId,
+          houseId: (entity as any)?.houseId,
+          name: ((entity as any)?.name ?? '').trim(),
+          description: (entity as any)?.description ?? null,
+          imagePath: nextImagePath,
         });
+      } else if (config.type === 'container') {
+        updatedRecord = await updatePowerSyncLocalContainer({
+          containerId: entityId,
+          houseId: (entity as any)?.houseId,
+          roomId: (entity as any)?.roomId,
+          name: ((entity as any)?.name ?? '').trim(),
+          description: (entity as any)?.description ?? null,
+          imagePath: nextImagePath,
+        });
+      } else if (config.type === 'box') {
+        updatedRecord = await updatePowerSyncLocalBox({
+          boxId: entityId,
+          houseId: (entity as any)?.houseId,
+          parentType: (entity as any)?.parentType ?? null,
+          parentId: (entity as any)?.parentId ?? null,
+          name: ((entity as any)?.name ?? '').trim(),
+          description: (entity as any)?.description ?? null,
+          imagePath: nextImagePath,
+          tags: (entity as any)?.tags ?? '',
+        });
+      } else {
+        updatedRecord = await updatePowerSyncLocalItem({
+          itemId: entityId,
+          houseId: (entity as any)?.houseId,
+          parentType: (entity as any)?.parentType ?? null,
+          parentId: (entity as any)?.parentId ?? null,
+          name: ((entity as any)?.name ?? '').trim(),
+          description: (entity as any)?.description ?? null,
+          imagePath: nextImagePath,
+          tags: (entity as any)?.tags ?? '',
+          purchasePriceCents: (entity as any)?.purchasePriceCents ?? null,
+          notes: (entity as any)?.notes ?? null,
+        });
+      }
+      setEntity({
+        ...(updatedRecord as LoadedEntity<T>),
+        imagePath: nextImagePath,
       });
-      const freshRecord = await database.collections.get<any>(config.collection).find(entityId);
-      setEntity(freshRecord);
+      setImagePath(nextImagePath);
       setEntityRevision((prev) => prev + 1);
+      triggerGlobalRefresh();
     },
-    [config.collection, config.type, entity, entityId, powerSyncReadModeEnabled, user?.id]
+    [config.type, entity, entityId, user?.id]
   );
 
   const handleViewPickImage = useCallback(async () => {
@@ -3393,7 +3040,8 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         <Appbar.BackAction onPress={handleBack} />
         <Appbar.Content
           style={{ alignItems: 'flex-start' }}
-          titleStyle={{ textAlign: 'left' }}
+          // Paper's types only allow titleStyle with a string title; the title here can be an element.
+          {...({ titleStyle: { textAlign: 'left' } } as object)}
           title={
             isFormMode ? (
               renderTitle()
@@ -3427,7 +3075,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
             {canModifyCurrentEntity ? (
               <Appbar.Action
                 icon="pencil"
-                onPress={() => router.push(`/${entityRouteSegment}/${id}?mode=edit`)}
+                onPress={() => router.push(`/${entityRouteSegment}/${id}?mode=edit` as any)}
                 accessibilityLabel={`Edit ${config.title}`}
                 testID={`entity-edit-${config.type}-button`}
               />
@@ -3463,7 +3111,7 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
               }
               openContextualCreateSheet(section.type);
             },
-            onPressItem: (childId: string) => router.push(`/${toRouteSegment(section.type)}/${childId}`),
+            onPressItem: (childId: string) => router.push(`/${toRouteSegment(section.type)}/${childId}` as any),
             onVoiceAdd:
               canWriteContent &&
               section.type === 'item' &&
@@ -3752,61 +3400,51 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
 
       <BottomSheetModal
         ref={diagnosticsSheetRef}
+        onChange={handleDiagnosticsSheetChange}
         snapPoints={['70%']}
         enableDynamicSizing={false}
         enablePanDownToClose
         backdropComponent={renderInviteSheetBackdrop}
-        handleStyle={{ paddingTop: spacing.xs }}
-        handleIndicatorStyle={{
-          backgroundColor: `${colors.onSurface}${opacity.alpha20}`,
-          width: 36,
-          height: 5,
-        }}
-        backgroundStyle={{
-          backgroundColor: colors.surface,
-          borderTopLeftRadius: 22,
-          borderTopRightRadius: 22,
-        }}
+        {...sheetChrome.modalProps}
       >
-        <BottomSheetScrollView
-          contentContainerStyle={{
-            paddingHorizontal: spacing.xxl,
-            paddingTop: spacing.xxl,
-            paddingBottom: spacing.xxl + insets.bottom,
-            gap: spacing.md,
-          }}
-        >
-          <Text
-            variant="titleMedium"
-            style={{
-              color: colors.onSurface,
-              textAlign: 'center',
-              fontWeight: '600',
+        <SheetTheme theme={theme}>
+          <BottomSheetScrollView
+            contentContainerStyle={{
+              paddingHorizontal: spacing.xxl,
+              paddingTop: spacing.xs,
+              paddingBottom: spacing.xxl + insets.bottom,
+              gap: spacing.xxl,
             }}
           >
-            Record diagnostics
-          </Text>
-          <Surface
-            elevation={elevation.level1}
-            style={{
-              padding: spacing.lg,
-              borderRadius: shapes.cornerLarge,
-              backgroundColor: surfaces.card,
-              gap: spacing.md,
-            }}
-          >
-            <Button mode="outlined" onPress={() => void loadRecordDiagnostics()} loading={recordDiagnosticsLoading}>
-              Refresh diagnostics
-            </Button>
-            <Text
-              variant="bodySmall"
-              selectable
-              style={{ color: colors.onSurfaceVariant, fontFamily: typography.monospace?.fontFamily }}
-            >
-              {recordDiagnosticsLoading ? 'Loading...' : recordDiagnostics}
-            </Text>
-          </Surface>
-        </BottomSheetScrollView>
+            <SheetHeader
+              title="Record diagnostics"
+              onClose={() => diagnosticsSheetRef.current?.dismiss()}
+              closeLabel="Close diagnostics"
+            />
+            <View style={{ flexDirection: 'row' }}>
+              <SheetButton
+                variant="secondary"
+                icon="refresh"
+                label="Refresh diagnostics"
+                loading={recordDiagnosticsLoading}
+                disabled={recordDiagnosticsLoading}
+                onPress={() => void loadRecordDiagnostics()}
+              />
+            </View>
+            <SheetCard>
+              <Text
+                variant="bodySmall"
+                selectable
+                style={{
+                  color: colors.onSurfaceVariant,
+                  fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }),
+                }}
+              >
+                {recordDiagnosticsLoading ? 'Loading...' : recordDiagnostics}
+              </Text>
+            </SheetCard>
+          </BottomSheetScrollView>
+        </SheetTheme>
       </BottomSheetModal>
 
       <BottomSheetModal
@@ -3819,149 +3457,129 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         keyboardBehavior="interactive"
         keyboardBlurBehavior="restore"
         android_keyboardInputMode="adjustResize"
-        handleStyle={{ paddingTop: spacing.xs }}
-        handleIndicatorStyle={{
-          backgroundColor: `${colors.onSurface}${opacity.alpha30}`,
-          width: 36,
-          height: 5,
-        }}
-        backgroundStyle={{
-          backgroundColor: colors.surface,
-          borderTopLeftRadius: 22,
-          borderTopRightRadius: 22,
-        }}
+        {...sheetChrome.modalProps}
       >
-        <BottomSheetScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{
-            paddingHorizontal: spacing.xxl,
-            paddingTop: spacing.xxl,
-            paddingBottom: spacing.xxl + insets.bottom,
-            gap: spacing.md,
-          }}
-        >
-          <Text
-            variant="titleMedium"
-            style={{
-              color: colors.onSurface,
-              textAlign: 'center',
-              fontWeight: '600',
+        <SheetTheme theme={theme}>
+          <BottomSheetScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{
+              paddingHorizontal: spacing.xxl,
+              paddingTop: spacing.xs,
+              paddingBottom: spacing.xxl + insets.bottom,
+              gap: spacing.xxl,
             }}
           >
-            Invite member
-          </Text>
-          {collaborationLoading || !collaboration ? (
-            <Surface
-              elevation={elevation.level1}
-              style={{
-                padding: spacing.xxl,
-                borderRadius: shapes.cornerLarge,
-                backgroundColor: surfaces.card,
-              }}
-            >
-              <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-                Loading plan and sharing access...
-              </Text>
-            </Surface>
-          ) : planSupportsSharing === false ? (
-            <Surface
-              elevation={elevation.level1}
-              style={{
-                padding: spacing.xxl,
-                borderRadius: shapes.cornerLarge,
-                backgroundColor: surfaces.card,
-                gap: spacing.sm,
-              }}
-            >
-              <Text variant="titleSmall" style={{ color: colors.onSurface }}>
-                Home sharing is not available on your current plan.
-              </Text>
-              <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-                Upgrade your plan to invite members to this house.
-              </Text>
-            </Surface>
-          ) : (
-            <Surface
-              elevation={elevation.level1}
-              style={{
-                padding: spacing.xxl,
-                borderRadius: shapes.cornerLarge,
-                backgroundColor: surfaces.card,
-                gap: spacing.lg,
-              }}
-            >
-              {latestInviteCode ? (
-                <Surface
-                  elevation={elevation.level1}
-                  style={{
-                    borderRadius: shapes.cornerLarge,
-                    backgroundColor: surfaces.cardLow,
-                    padding: spacing.lg,
-                    gap: spacing.sm,
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text variant="labelLarge" style={{ color: colors.onSurface }}>
-                      Invitation code
-                    </Text>
-                    <IconButton
-                      icon="share-variant"
-                      onPress={() => void handleShareLatestInvite()}
-                      iconColor={colors.primary}
-                      size={20}
-                    />
-                  </View>
-                  <Text variant="titleMedium" style={{ color: colors.onSurface, fontWeight: '700' }}>
+            <SheetHeader
+              title="Invite member"
+              onClose={() => inviteSheetRef.current?.dismiss()}
+              closeLabel="Close invite"
+            />
+            {collaborationLoading || !collaboration ? (
+              <SheetCard>
+                <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
+                  Loading plan and sharing access...
+                </Text>
+              </SheetCard>
+            ) : planSupportsSharing === false ? (
+              <SheetNotice tone="info">
+                Home sharing is not available on your current plan. Upgrade your plan to invite members to this house.
+              </SheetNotice>
+            ) : latestInviteCode ? (
+              <>
+                <SheetCard label="Invitation code">
+                  <Text
+                    variant="headlineSmall"
+                    selectable
+                    style={{ color: colors.onSurface, fontWeight: '700', letterSpacing: 2, textAlign: 'center' }}
+                  >
                     {latestInviteCode}
                   </Text>
-                  <Text variant="bodySmall" style={{ color: colors.onSurfaceVariant }}>
+                  <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant, textAlign: 'center' }}>
                     Share this code to invite {latestInviteRole ?? 'member'} to your house.
                   </Text>
-                </Surface>
-              ) : (
-                <>
-                  <TextInput
-                    mode="outlined"
-                    label="Member name"
-                    value={inviteeName}
-                    onChangeText={setInviteeName}
-                    autoCapitalize="words"
-                    outlineColor={colors.outline}
-                    activeOutlineColor={colors.primary}
-                    textColor={colors.onSurface}
+                </SheetCard>
+                <View style={{ flexDirection: 'row' }}>
+                  <SheetButton
+                    icon="share-variant"
+                    label="Share code"
+                    onPress={() => void handleShareLatestInvite()}
                   />
-                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                    {(['viewer', 'editor', 'admin'] as InviteRole[]).map((role) => (
-                      <Button
-                        key={role}
-                        mode="contained-tonal"
-                        onPress={() => setInviteRole(role)}
-                        buttonColor={inviteRole === role ? colors.primaryContainer : surfaces.cardLow}
-                        textColor={inviteRole === role ? colors.onPrimaryContainer : colors.onSurface}
-                        compact
-                        style={{ borderRadius: shapes.cornerFull, flex: 1, minWidth: 0 }}
-                      >
-                        {role}
-                      </Button>
-                    ))}
-                  </View>
-                  <Button
-                    mode="contained-tonal"
-                    onPress={() => void handleCreateInvite()}
-                    loading={inviteCreateLoading}
-                    disabled={!inviteeName.trim()}
-                    buttonColor={colors.primaryContainer}
-                    textColor={colors.onPrimaryContainer}
-                    contentStyle={{ paddingVertical: spacing.sm }}
-                    style={{ borderRadius: shapes.cornerFull }}
+                </View>
+              </>
+            ) : (
+              <>
+                <TextInput
+                  mode="outlined"
+                  label="Member name"
+                  value={inviteeName}
+                  onChangeText={setInviteeName}
+                  autoCapitalize="words"
+                  outlineColor={colors.outline}
+                  activeOutlineColor={colors.primary}
+                  textColor={colors.onSurface}
+                  style={{ backgroundColor: sheetChrome.sheetBackground }}
+                />
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="labelLarge" style={{ color: colors.onSurfaceVariant }}>
+                    Role
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      padding: spacing.xxs,
+                      gap: spacing.xxs,
+                      borderRadius: shapes.cornerFull,
+                      backgroundColor: sheetChrome.cardBackground,
+                      borderWidth: 1,
+                      borderColor: sheetChrome.hairline,
+                    }}
                   >
-                    Create invitation
-                  </Button>
-                </>
-              )}
-            </Surface>
-          )}
-        </BottomSheetScrollView>
+                    {(['viewer', 'editor', 'admin'] as InviteRole[]).map((role) => {
+                      const selected = inviteRole === role;
+                      return (
+                        <Pressable
+                          key={role}
+                          onPress={() => setInviteRole(role)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Invite as ${role}`}
+                          accessibilityState={{ selected }}
+                          style={{
+                            flex: 1,
+                            minHeight: 40,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: shapes.cornerFull,
+                            backgroundColor: selected ? colors.primaryContainer : 'transparent',
+                          }}
+                        >
+                          <Text
+                            variant="labelLarge"
+                            style={{
+                              color: selected ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                              fontWeight: selected ? '600' : '400',
+                              textTransform: 'capitalize',
+                            }}
+                          >
+                            {role}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row' }}>
+                  <SheetButton
+                    icon="account-plus-outline"
+                    label="Create invitation"
+                    loading={inviteCreateLoading}
+                    disabled={!inviteeName.trim() || inviteCreateLoading}
+                    onPress={() => void handleCreateInvite()}
+                  />
+                </View>
+              </>
+            )}
+          </BottomSheetScrollView>
+        </SheetTheme>
       </BottomSheetModal>
 
       <BottomSheetModal
@@ -3972,99 +3590,54 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         onChange={setManageMemberSheetIndex}
         onDismiss={() => setManagedMember(null)}
         backdropComponent={renderInviteSheetBackdrop}
-        handleStyle={{ paddingTop: spacing.xs }}
-        handleIndicatorStyle={{
-          backgroundColor: `${colors.onSurface}${opacity.alpha30}`,
-          width: 36,
-          height: 5,
-        }}
-        backgroundStyle={{
-          backgroundColor: colors.surface,
-          borderTopLeftRadius: 22,
-          borderTopRightRadius: 22,
-        }}
+        {...sheetChrome.modalProps}
       >
-        <BottomSheetScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{
-            paddingHorizontal: spacing.xxl,
-            paddingTop: spacing.xxl,
-            paddingBottom: spacing.xxl + insets.bottom,
-            gap: spacing.md,
-          }}
-        >
-          <Text
-            variant="titleMedium"
-            style={{
-              color: colors.onSurface,
-              textAlign: 'center',
-              fontWeight: '600',
+        <SheetTheme theme={theme}>
+          <BottomSheetScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{
+              paddingHorizontal: spacing.xxl,
+              paddingTop: spacing.xs,
+              paddingBottom: spacing.xxl + insets.bottom,
+              gap: spacing.xxl,
             }}
           >
-            Manage member
-          </Text>
-          <Surface
-            elevation={elevation.level1}
-            style={{
-              padding: spacing.xxl,
-              borderRadius: shapes.cornerLarge,
-              backgroundColor: surfaces.card,
-              gap: spacing.md,
-            }}
-          >
-            <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-              {managedMember?.label ?? 'Member'}
-            </Text>
-            <Button
-              mode="contained-tonal"
-              onPress={() => void handleSetManagedMemberRole('admin')}
-              buttonColor={colors.primaryContainer}
-              textColor={colors.onPrimaryContainer}
-              contentStyle={{ paddingVertical: spacing.sm }}
-              style={{ borderRadius: shapes.cornerFull }}
-            >
-              Set admin
-            </Button>
-            <Button
-              mode="contained-tonal"
-              onPress={() => void handleSetManagedMemberRole('editor')}
-              buttonColor={colors.primaryContainer}
-              textColor={colors.onPrimaryContainer}
-              contentStyle={{ paddingVertical: spacing.sm }}
-              style={{ borderRadius: shapes.cornerFull }}
-            >
-              Set editor
-            </Button>
-            <Button
-              mode="contained-tonal"
-              onPress={() => void handleSetManagedMemberRole('viewer')}
-              buttonColor={colors.primaryContainer}
-              textColor={colors.onPrimaryContainer}
-              contentStyle={{ paddingVertical: spacing.sm }}
-              style={{ borderRadius: shapes.cornerFull }}
-            >
-              Set viewer
-            </Button>
-            <Button
-              mode="contained-tonal"
-              onPress={() => void handleRemoveManagedMember()}
-              buttonColor={colors.errorContainer}
-              textColor={colors.onErrorContainer}
-              contentStyle={{ paddingVertical: spacing.sm }}
-              style={{ borderRadius: shapes.cornerFull }}
-            >
-              Remove member
-            </Button>
-            <Button
-              mode="outlined"
-              onPress={() => manageMemberSheetRef.current?.dismiss()}
-              contentStyle={{ paddingVertical: spacing.sm }}
-              style={{ borderRadius: shapes.cornerFull }}
-            >
-              Close
-            </Button>
-          </Surface>
-        </BottomSheetScrollView>
+            <SheetHeader
+              title="Manage member"
+              subtitle={managedMember?.label ?? 'Member'}
+              onClose={() => manageMemberSheetRef.current?.dismiss()}
+              closeLabel="Close manage member"
+            />
+            <SheetCard label="Change role">
+              <SheetRow
+                icon="shield-account-outline"
+                title="Admin"
+                accessibilityLabel="Set admin"
+                onPress={() => void handleSetManagedMemberRole('admin')}
+              />
+              <SheetRow
+                icon="pencil-outline"
+                title="Editor"
+                accessibilityLabel="Set editor"
+                onPress={() => void handleSetManagedMemberRole('editor')}
+              />
+              <SheetRow
+                icon="eye-outline"
+                title="Viewer"
+                accessibilityLabel="Set viewer"
+                onPress={() => void handleSetManagedMemberRole('viewer')}
+              />
+            </SheetCard>
+            <View style={{ flexDirection: 'row' }}>
+              <SheetButton
+                variant="danger"
+                icon="account-remove-outline"
+                label="Remove member"
+                onPress={() => void handleRemoveManagedMember()}
+              />
+            </View>
+          </BottomSheetScrollView>
+        </SheetTheme>
       </BottomSheetModal>
 
       {shouldRenderFabOverlay ? renderFabOverlay(
@@ -4168,7 +3741,11 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
         visible={deleteDialogVisible}
         testID={`entity-delete-${config.type}-dialog`}
         title={`Delete ${config.title}`}
-        message={`Are you sure you want to delete this ${config.title.toLowerCase()} and all of its content? This cannot be undone.`}
+        message={
+          config.type === 'item'
+            ? 'Are you sure you want to delete this item? This cannot be undone.'
+            : `Are you sure you want to delete this ${config.title.toLowerCase()} and everything in it? This cannot be undone.`
+        }
         confirmLabel="Delete"
         destructive
         loading={saving}

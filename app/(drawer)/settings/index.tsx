@@ -408,7 +408,7 @@ export default function SettingsScreen() {
                 <Button
                   mode="outlined"
                   style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}
-                  onPress={openSignIn}
+                  onPress={() => openSignIn()}
                 >
                   Sign in
                 </Button>
@@ -486,7 +486,7 @@ export default function SettingsScreen() {
                   variant="bodyMedium"
                   style={{ color: colors.onSurfaceVariant }}
                 >
-                  Open the PowerSync database, connect for stream testing, or run the local migration manually.
+                  Open the PowerSync database, connect for stream testing, or inspect local and synced data.
                 </Text>
                 <Button
                   mode="outlined"

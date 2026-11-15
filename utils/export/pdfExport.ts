@@ -2,12 +2,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Print from 'expo-print';
 import { PDFDocument } from 'pdf-lib';
-import { database } from '../storage/database';
 import type { CurrencyCode } from '../currency';
 import { formatCurrencyFromCents, loadCurrencyPreference } from '../currency';
 import { toAbsoluteImagePath } from '../imageUtils';
-import { getItemImages, type ItemImageRecord } from '../itemImages';
-import { loadPowerSyncReadModeEnabled } from '../powersync/readMode';
+import type { ItemImageRecord } from '../itemImages';
 import {
   getPowerSyncRepositoryBoxes,
   getPowerSyncRepositoryContainers,
@@ -754,30 +752,21 @@ export const generateInventoryPdfExport = async (
   options?: PdfExportOptions
 ): Promise<GeneratePdfExportResult> => {
   const currency = await loadCurrencyPreference();
-  const powerSyncReadModeEnabled = await loadPowerSyncReadModeEnabled();
-  const [allHouses, allRooms, allContainers, allBoxes, allItems] = powerSyncReadModeEnabled
-    ? await Promise.all([
-        getPowerSyncRepositoryHouses().then((houses) =>
-          houses.map((house) => ({
-            id: house.id,
-            name: house.name ?? '',
-            address: house.address,
-            notes: house.notes,
-            imagePath: house.image_path,
-          }))
-        ),
-        getPowerSyncRepositoryRooms() as Promise<RoomRecord[]>,
-        getPowerSyncRepositoryContainers() as Promise<ContainerRecord[]>,
-        getPowerSyncRepositoryBoxes() as Promise<BoxRecord[]>,
-        getPowerSyncRepositoryItems() as Promise<ItemRecord[]>,
-      ])
-    : await Promise.all([
-        database.collections.get<any>('houses').query().fetch() as Promise<HouseRecord[]>,
-        database.collections.get<any>('rooms').query().fetch() as Promise<RoomRecord[]>,
-        database.collections.get<any>('containers').query().fetch() as Promise<ContainerRecord[]>,
-        database.collections.get<any>('boxes').query().fetch() as Promise<BoxRecord[]>,
-        database.collections.get<any>('items').query().fetch() as Promise<ItemRecord[]>,
-      ]);
+  const [allHouses, allRooms, allContainers, allBoxes, allItems] = await Promise.all([
+    getPowerSyncRepositoryHouses().then((houses) =>
+      houses.map((house) => ({
+        id: house.id,
+        name: house.name ?? '',
+        address: house.address,
+        notes: house.notes,
+        imagePath: house.image_path,
+      }))
+    ),
+    getPowerSyncRepositoryRooms() as Promise<RoomRecord[]>,
+    getPowerSyncRepositoryContainers() as Promise<ContainerRecord[]>,
+    getPowerSyncRepositoryBoxes() as Promise<BoxRecord[]>,
+    getPowerSyncRepositoryItems() as Promise<ItemRecord[]>,
+  ]);
 
   const selectedHouseIds =
     options?.houseIds && options.houseIds.length > 0 ? new Set(options.houseIds) : null;
@@ -793,16 +782,14 @@ export const generateInventoryPdfExport = async (
   const itemImagesByItemId = new Map<string, ItemImageRecord[]>();
   await Promise.all(
     items.map(async (item) => {
-      const recordImages = powerSyncReadModeEnabled
-        ? (await getPowerSyncRepositoryItemImages(undefined, item.id)).map((image) => ({
-            id: image.id,
-            itemId: image.itemId,
-            houseId: image.houseId,
-            imagePath: image.imagePath,
-            remotePath: image.remotePath,
-            position: image.position,
-          }))
-        : await getItemImages(item.id);
+      const recordImages = (await getPowerSyncRepositoryItemImages(undefined, item.id)).map((image) => ({
+        id: image.id,
+        itemId: image.itemId,
+        houseId: image.houseId,
+        imagePath: image.imagePath,
+        remotePath: image.remotePath,
+        position: image.position,
+      }));
       itemImagesByItemId.set(item.id, recordImages.sort(compareItemImages));
     })
   );

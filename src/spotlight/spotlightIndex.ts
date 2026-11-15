@@ -1,7 +1,5 @@
 import { Platform, NativeEventEmitter, NativeModules } from 'react-native';
-import { database } from '@/utils/storage/database';
 import { loadSpotlightItemsEnabled } from '@/utils/spotlightPreference';
-import { loadPowerSyncReadModeEnabled } from '@/utils/powersync/readMode';
 import {
   getPowerSyncRepositoryBoxes,
   getPowerSyncRepositoryContainers,
@@ -28,17 +26,6 @@ type SpotlightBridge = {
   reindexAll: (payloads: SpotlightItemPayload[]) => Promise<void>;
   clearIndex: () => Promise<void>;
   consumePendingURL?: () => Promise<string | null>;
-};
-
-type ItemRecordLike = {
-  id: string;
-  name?: string | null;
-  houseId?: string | null;
-  house_id?: string | null;
-  parentType?: string | null;
-  parent_type?: string | null;
-  parentId?: string | null;
-  parent_id?: string | null;
 };
 
 const bridge = NativeModules.EverfindSpotlightBridge as SpotlightBridge | undefined;
@@ -68,40 +55,6 @@ const splitRoutePath = (path: string) =>
     .filter(Boolean);
 
 const joinPath = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(' > ');
-
-const resolveParentLocation = async (
-  parentType: string | null | undefined,
-  parentId: string | null | undefined
-) => {
-  if (!parentType || !parentId) return [] as string[];
-
-  if (parentType === 'room') {
-    const room = await database.collections.get<any>('rooms').find(parentId);
-    return [room.name].filter(Boolean);
-  }
-
-  if (parentType === 'container') {
-    const container = await database.collections.get<any>('containers').find(parentId);
-    const room = await database.collections.get<any>('rooms').find(container.roomId);
-    return [room.name, container.name].filter(Boolean);
-  }
-
-  if (parentType === 'box') {
-    const box = await database.collections.get<any>('boxes').find(parentId);
-    if (box.parentType === 'container' && box.parentId) {
-      const container = await database.collections.get<any>('containers').find(box.parentId);
-      const room = await database.collections.get<any>('rooms').find(container.roomId);
-      return [room.name, container.name, box.name].filter(Boolean);
-    }
-    if (box.parentType === 'room' && box.parentId) {
-      const room = await database.collections.get<any>('rooms').find(box.parentId);
-      return [room.name, box.name].filter(Boolean);
-    }
-    return [box.name].filter(Boolean);
-  }
-
-  return [];
-};
 
 const buildPowerSyncPayloadFromItem = (
   item: PowerSyncRepositoryItem,
@@ -219,54 +172,22 @@ export const reindexAllSpotlightItems = async (payloads?: SpotlightItemPayload[]
   }
 };
 
-export const buildSpotlightPayloadForItem = async (item: ItemRecordLike) => {
-  const houseId = (item.houseId ?? item.house_id ?? null)?.toString();
-  const parentType = (item.parentType ?? item.parent_type ?? null)?.toString();
-  const parentId = (item.parentId ?? item.parent_id ?? null)?.toString();
-  const name = item.name?.trim() ?? '';
-  if (!item.id || !name || !houseId) return null;
-
-  try {
-    const house = await database.collections.get<any>('houses').find(houseId);
-    const parentParts = await resolveParentLocation(parentType, parentId);
-    const locationParts = [house.name, ...parentParts].filter(Boolean);
-    const locationPath = joinPath(...locationParts);
-    if (!locationPath) return null;
-    return normalizePayload({
-      id: item.id,
-      name,
-      locationPath,
-    });
-  } catch (error) {
-    devLog('buildSpotlightPayloadForItem failed', { id: item.id, error });
-    return null;
-  }
-};
-
 export const upsertSpotlightItemById = async (itemId: string) => {
   if (!(await canIndex())) return;
   try {
-    if (await loadPowerSyncReadModeEnabled()) {
-      const items = await getPowerSyncRepositoryItems();
-      const item = items.find((candidate) => candidate.id === itemId);
-      if (!item) {
-        await bridge!.deleteItem(itemId);
-        return;
-      }
-      const [houses, rooms, containers, boxes] = await Promise.all([
-        getPowerSyncRepositoryHouses(),
-        getPowerSyncRepositoryRooms(),
-        getPowerSyncRepositoryContainers(),
-        getPowerSyncRepositoryBoxes(),
-      ]);
-      const payload = buildPowerSyncPayloadFromItem(item, { houses, rooms, containers, boxes });
-      if (!payload) return;
-      await bridge!.upsertItem(payload);
+    const items = await getPowerSyncRepositoryItems();
+    const item = items.find((candidate) => candidate.id === itemId);
+    if (!item) {
+      await bridge!.deleteItem(itemId);
       return;
     }
-
-    const item = await database.collections.get<any>('items').find(itemId);
-    const payload = await buildSpotlightPayloadForItem(item);
+    const [houses, rooms, containers, boxes] = await Promise.all([
+      getPowerSyncRepositoryHouses(),
+      getPowerSyncRepositoryRooms(),
+      getPowerSyncRepositoryContainers(),
+      getPowerSyncRepositoryBoxes(),
+    ]);
+    const payload = buildPowerSyncPayloadFromItem(item, { houses, rooms, containers, boxes });
     if (!payload) return;
     await bridge!.upsertItem(payload);
   } catch (error) {
@@ -275,13 +196,7 @@ export const upsertSpotlightItemById = async (itemId: string) => {
 };
 
 export const buildAllSpotlightPayloads = async () => {
-  if (await loadPowerSyncReadModeEnabled()) {
-    return buildPowerSyncSpotlightPayloads();
-  }
-
-  const items = await database.collections.get<any>('items').query().fetch();
-  const payloads = await Promise.all(items.map((item) => buildSpotlightPayloadForItem(item)));
-  return payloads.filter((payload): payload is SpotlightItemPayload => Boolean(payload));
+  return buildPowerSyncSpotlightPayloads();
 };
 
 export const consumePendingSpotlightURL = async () => {

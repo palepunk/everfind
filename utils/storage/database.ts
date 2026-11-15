@@ -2,7 +2,7 @@ import { getPowerSyncDatabase } from '@/utils/powersync/system';
 import type { QueryCondition } from './query';
 import { Observable } from 'rxjs';
 
-type TableName =
+export type TableName =
   | 'houses'
   | 'rooms'
   | 'containers'
@@ -157,16 +157,35 @@ const fetchAll = async (table: TableName) => {
   return rows.map((row) => toRecord(table, row));
 };
 
-const makeObservable = <T>(load: () => Promise<T>) =>
+// Emits the current value, then again whenever the backing table changes.
+const makeObservable = <T>(table: TableName, load: () => Promise<T>) =>
   new Observable<T>((subscriber) => {
-    load()
-      .then((value) => {
-        subscriber.next(value);
-      })
-      .catch((error) => {
-        subscriber.error(error);
-      });
-    return () => undefined;
+    let closed = false;
+    const emit = () => {
+      load()
+        .then((value) => {
+          if (!closed) subscriber.next(value);
+        })
+        .catch((error) => {
+          if (!closed) subscriber.error(error);
+        });
+    };
+
+    emit();
+    const dispose = getPowerSyncDatabase().onChange(
+      {
+        onChange: emit,
+        onError: (error) => {
+          console.warn('Local database watch failed', error);
+        },
+      },
+      { tables: [tableName(table)] }
+    );
+
+    return () => {
+      closed = true;
+      dispose?.();
+    };
   });
 
 const createQuery = (table: TableName, conditions: QueryCondition[]) => ({
@@ -177,13 +196,13 @@ const createQuery = (table: TableName, conditions: QueryCondition[]) => ({
     return (await this.fetch()).length;
   },
   observeCount() {
-    return makeObservable(() => this.fetchCount());
+    return makeObservable(table, () => this.fetchCount());
   },
   observe() {
-    return makeObservable(() => this.fetch());
+    return makeObservable(table, () => this.fetch());
   },
   observeWithColumns(_columns: string[]) {
-    return makeObservable(() => this.fetch());
+    return makeObservable(table, () => this.fetch());
   },
 });
 
@@ -200,7 +219,7 @@ const createCollection = (table: TableName) => ({
     return toRecord(table, row);
   },
   findAndObserve(id: string) {
-    return makeObservable(() => this.find(id));
+    return makeObservable(table, () => this.find(id));
   },
   async create(builder: (record: any) => void) {
     const record: Record<string, any> = { _raw: {} };

@@ -359,3 +359,30 @@ test('PowerSync repository keeps local fallback while first sync state is not co
   assert.ok(normalized.includes('synced_house_ids(house_id) AS (VALUES (NULL))'));
   assert.ok(normalized.includes('NOT (house_id IN (SELECT house_id FROM synced_house_ids) AND source_rank > 0)'));
 });
+
+test('PowerSync repository row queries leave out rows of tombstoned houses', async () => {
+  const repository = createRepositoryModule();
+  const hiddenHouse = (column) =>
+    `NOT EXISTS (SELECT 1 FROM local_metadata hidden_house WHERE hidden_house.id = 'deleted:houses:' || ${column})`;
+
+  await repository.getPowerSyncRepositoryRooms();
+  await repository.getPowerSyncRepositoryContainers();
+  await repository.getPowerSyncRepositoryBoxes();
+  await repository.getPowerSyncRepositoryItems();
+  await repository.getPowerSyncRepositoryItemImages();
+
+  const sqlFor = (marker) =>
+    normalizeSql(
+      repository.database.calls.find(
+        (call) => call.method === 'getAll' && normalizeSql(call.sql).includes(marker)
+      ).sql
+    );
+
+  assert.ok(sqlFor('FROM local_rooms )').includes(hiddenHouse('house_id')));
+  assert.ok(sqlFor('effective_house_id AS houseId').includes(hiddenHouse('effective_house_id')));
+  assert.ok(sqlFor('FROM local_boxes )').includes(hiddenHouse('house_id')));
+  assert.ok(sqlFor('FROM local_items )').includes(hiddenHouse('house_id')));
+  assert.ok(
+    sqlFor('LEFT JOIN local_item_images local').includes(hiddenHouse('coalesce(synced.house_id, local.house_id)'))
+  );
+});
