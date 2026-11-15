@@ -1,0 +1,4 @@
+Redesigned bottom sheets, including bulk voice add, export and sharing.
+The Android Back button now closes an open sheet instead of leaving the screen.
+Faster inventory screens and smaller app size after removing old storage code.
+Bug fixes.
