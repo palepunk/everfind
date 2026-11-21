@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   Animated,
   BackHandler,
@@ -60,14 +60,64 @@ export function useSheetChrome() {
   }, [colors.onSurface, colors.surface, opacity.alpha12, opacity.alpha30, surfaces.card]);
 }
 
+// Number of bottom sheets currently open anywhere in the app. On iOS the create
+// FAB lives in a FullWindowOverlay, a separate native window above every sheet,
+// so screens read this to hide the FAB while a sheet is up.
+let openSheetCount = 0;
+const openSheetListeners = new Set<() => void>();
+
+const changeOpenSheetCount = (delta: number) => {
+  openSheetCount = Math.max(0, openSheetCount + delta);
+  openSheetListeners.forEach((listener) => listener());
+};
+
+const subscribeOpenSheets = (listener: () => void) => {
+  openSheetListeners.add(listener);
+  return () => {
+    openSheetListeners.delete(listener);
+  };
+};
+
+/** True while any sheet that reports through useTrackSheetOpen is open. */
+export function useAnySheetOpen() {
+  return useSyncExternalStore(subscribeOpenSheets, () => openSheetCount > 0);
+}
+
+/**
+ * Reports a bottom sheet's open state for useAnySheetOpen. Pass the returned
+ * handler as the sheet's onChange, or call it from an existing onChange.
+ */
+export function useTrackSheetOpen() {
+  const openRef = useRef(false);
+
+  useEffect(
+    () => () => {
+      if (openRef.current) {
+        openRef.current = false;
+        changeOpenSheetCount(-1);
+      }
+    },
+    []
+  );
+
+  return useCallback((index: number) => {
+    const open = index >= 0;
+    if (open === openRef.current) return;
+    openRef.current = open;
+    changeOpenSheetCount(open ? 1 : -1);
+  }, []);
+}
+
 /**
  * Makes the Android Back button close a bottom sheet modal instead of leaving
- * the screen (or the app). Pass the returned handler as the sheet's onChange,
- * or call it from an existing onChange. The listener is only registered while
- * the sheet is open, so it takes priority over screen-level Back handlers.
+ * the screen (or the app), and reports the sheet as open (useTrackSheetOpen).
+ * Pass the returned handler as the sheet's onChange, or call it from an
+ * existing onChange. The listener is only registered while the sheet is open,
+ * so it takes priority over screen-level Back handlers.
  */
 export function useSheetBackHandler(sheetRef: React.RefObject<{ dismiss: () => void } | null>) {
   const subscriptionRef = useRef<NativeEventSubscription | null>(null);
+  const trackOpen = useTrackSheetOpen();
 
   const release = useCallback(() => {
     subscriptionRef.current?.remove();
@@ -78,6 +128,7 @@ export function useSheetBackHandler(sheetRef: React.RefObject<{ dismiss: () => v
 
   return useCallback(
     (index: number) => {
+      trackOpen(index);
       if (index < 0) {
         release();
         return;
@@ -88,7 +139,7 @@ export function useSheetBackHandler(sheetRef: React.RefObject<{ dismiss: () => v
         return true;
       });
     },
-    [release, sheetRef]
+    [release, sheetRef, trackOpen]
   );
 }
 

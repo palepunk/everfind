@@ -27,6 +27,7 @@ import { AppTheme } from '../../utils/theme/theme';
 import { useThemePreference } from '../../utils/theme/themePreference';
 import { VoiceIntentModal } from '../../components/voice/VoiceIntentModal';
 import { AppProgressDialog } from '../../components/AppProgressDialog';
+import { useAnySheetOpen } from '../../components/sheets/SheetKit';
 import {
   loadSyncedHouseIds,
   saveLastSyncAt,
@@ -233,7 +234,9 @@ export default function Index() {
 
   const isOverLimit = useMemo(() => isOverAnyLimit(limitCounts, planLimits), [limitCounts, planLimits]);
   const canShowCreateFab = canWriteActiveHouse;
-  const shouldRenderFabOverlay = canShowCreateFab && isFocused;
+  // On iOS the FAB overlay is a window above every sheet, so hide it while one is open.
+  const anySheetOpen = useAnySheetOpen();
+  const shouldRenderFabOverlay = canShowCreateFab && isFocused && !anySheetOpen && !isVoiceModalVisible;
 
   useEffect(() => {
     AsyncStorage.getItem(INSTALL_DEFAULT_HOUSE_ID_KEY)

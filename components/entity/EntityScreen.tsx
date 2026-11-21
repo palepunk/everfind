@@ -17,6 +17,7 @@ import {
   SheetNotice,
   SheetRow,
   SheetTheme,
+  useAnySheetOpen,
   useSheetBackHandler,
   useSheetChrome,
 } from '@/components/sheets/SheetKit';
@@ -2310,8 +2311,18 @@ export function EntityScreen<T>({ config, id, entry }: EntityScreenProps<T>) {
     return actions;
   }, [canWriteContent, config.children, config.type, entityId, isFormMode, openContextualCreateSheet]);
   const childFabCount = childFabActions?.length ?? 0;
+  // On iOS the FAB overlay is a window above every sheet, so hide it while one is open.
+  const anySheetOpen = useAnySheetOpen();
   const shouldRenderFabOverlay =
-    !isFormMode && childFabCount > 0 && isFocused && !createSheetVisible && !imageLoading && !fullImageVisible;
+    !isFormMode &&
+    childFabCount > 0 &&
+    isFocused &&
+    !createSheetVisible &&
+    !anySheetOpen &&
+    inviteSheetIndex < 0 &&
+    manageMemberSheetIndex < 0 &&
+    !imageLoading &&
+    !fullImageVisible;
 
   useEffect(() => {
     if (!shouldRenderFabOverlay && fabOpen) {
